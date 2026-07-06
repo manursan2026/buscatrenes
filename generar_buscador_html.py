@@ -32,8 +32,8 @@ TEMPLATE = """<!DOCTYPE html>
        background-repeat:no-repeat;
        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
        -webkit-font-smoothing:antialiased;}
-  .wrap{max-width:720px;margin:0 auto;padding:18px 14px 60px}
-  h1{font-size:1.45rem;margin:26px 0 24px;letter-spacing:-.01em}
+  .wrap{max-width:720px;margin:0 auto;padding:28px 14px 60px}
+  h1{font-size:1.45rem;margin:34px 0 24px;letter-spacing:-.01em}
   .card{background:linear-gradient(180deg,var(--panel) 0%,#121b26 100%);
         border:1px solid var(--border);border-radius:16px;padding:18px 16px;
         margin-bottom:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
