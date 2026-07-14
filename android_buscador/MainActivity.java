@@ -5,17 +5,26 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.util.Base64;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.regex.Pattern;
+
 /**
  * Envoltorio mínimo: un WebView a pantalla completa que carga el buscador
- * (buscador_trenes.html, autocontenido) desde los assets. Sin red: la app
- * funciona completamente offline. La geolocalización del HTML se puentea
- * al permiso de localización de Android.
+ * (buscador_trenes.html, autocontenido) desde los assets. El buscador funciona
+ * completamente offline; la red solo se usa (si la hay) para descargar las
+ * incidencias en tiempo real vía el puente AndroidNet, que además esquiva el
+ * bloqueo CORS del feed de RENFE. La geolocalización del HTML se puentea al
+ * permiso de localización de Android.
  */
 public class MainActivity extends Activity {
 
@@ -59,6 +68,39 @@ public class MainActivity extends Activity {
                 startActivity(Intent.createChooser(i, "Compartir itinerario"));
             }
         }, "AndroidShare");
+
+        // Puente de red para las incidencias en tiempo real: el JS pide una URL
+        // https y recibe el cuerpo en base64 vía window.__netCb(id, b64|null).
+        wv.addJavascriptInterface(new Object() {
+            private final Pattern ID_OK = Pattern.compile("[0-9]+");
+
+            @JavascriptInterface
+            public void fetch(String url, String cbId) {
+                if (cbId == null || !ID_OK.matcher(cbId).matches()) return;
+                new Thread(() -> {
+                    String b64 = null;
+                    try {
+                        URL u = new URL(url);
+                        if (!"https".equals(u.getProtocol())) throw new Exception("solo https");
+                        HttpURLConnection c = (HttpURLConnection) u.openConnection();
+                        c.setConnectTimeout(10000);
+                        c.setReadTimeout(15000);
+                        try (InputStream in = c.getInputStream();
+                             ByteArrayOutputStream bo = new ByteArrayOutputStream()) {
+                            byte[] buf = new byte[8192];
+                            int n;
+                            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                            b64 = Base64.encodeToString(bo.toByteArray(), Base64.NO_WRAP);
+                        } finally {
+                            c.disconnect();
+                        }
+                    } catch (Exception e) { /* sin red o error http: b64 = null */ }
+                    final String arg = b64 == null ? "null" : "\"" + b64 + "\"";
+                    wv.post(() -> wv.evaluateJavascript(
+                            "window.__netCb(\"" + cbId + "\"," + arg + ")", null));
+                }).start();
+            }
+        }, "AndroidNet");
 
         setContentView(wv);
         wv.loadUrl("file:///android_asset/buscador_trenes.html");

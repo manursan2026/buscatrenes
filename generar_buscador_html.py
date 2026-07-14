@@ -42,12 +42,12 @@ TEMPLATE = """<!DOCTYPE html>
   label:first-child{margin-top:0}
   .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
   .row > div{flex:1 1 130px;min-width:0}
-  input[type=text],input[type=date],input[type=time],input[type=number]{
+  input[type=text],input[type=date],input[type=time],input[type=number],select{
     width:100%;padding:12px 13px;border-radius:11px;border:1px solid var(--border);
     background:var(--panel2);color:var(--text);font-size:16px;
     transition:border-color .15s, box-shadow .15s;
   }
-  input:focus{outline:none;border-color:var(--accent);
+  input:focus,select:focus{outline:none;border-color:var(--accent);
     box-shadow:0 0 0 3px rgba(59,130,246,.25)}
   .autocomplete{position:relative}
   .sugg{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--panel2);
@@ -108,6 +108,18 @@ TEMPLATE = """<!DOCTYPE html>
     border-left:3px solid var(--accent);background:rgba(59,130,246,.07);
     border-radius:8px;font-size:.82rem;color:var(--muted)}
   .transbordo b{color:var(--text)}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);
+    background:var(--panel2);color:var(--muted);font-size:.82rem;font-weight:700;
+    cursor:pointer;text-align:center}
+  .tab.active{background:rgba(59,130,246,.15);border-color:var(--accent);color:var(--text)}
+  .tab[hidden]{display:none}
+  .tabpanel{display:none}
+  .tabpanel.active{display:block}
+  .incidencia{margin:8px 0 0;padding:8px 12px;line-height:1.45;
+    border-left:3px solid #f0b429;background:rgba(240,180,41,.08);
+    border-radius:8px;font-size:.8rem;color:var(--muted)}
+  .incidencia b{color:var(--text)}
   .leg{padding:4px 0}
   .leg + .leg{border-top:none}
   footer{color:var(--muted);font-size:.72rem;text-align:center;margin-top:28px;
@@ -119,48 +131,76 @@ TEMPLATE = """<!DOCTYPE html>
 <div class="wrap">
   <h1>🚆 BuscaTrenes</h1>
 
+  <div class="tabs">
+    <button type="button" class="tab active" id="tab-estacion" data-tab="estacion">Por estación</button>
+    <button type="button" class="tab" id="tab-numero" data-tab="numero">Por número de tren</button>
+    <button type="button" class="tab" id="tab-incidencias" data-tab="incidencias" hidden>⚠️ Incidencias</button>
+  </div>
+
   <div class="card">
-    <label for="origen">Origen</label>
-    <div class="autocomplete">
-      <input type="text" id="origen" placeholder="Escribe una estación..." autocomplete="off">
-      <div class="sugg" id="sugg-origen"></div>
-    </div>
-    <button type="button" class="geobtn" id="btn-geo">📍 Usar mi ubicación</button>
-    <div class="geostatus" id="geo-status"></div>
-
-    <label for="destino">Destino</label>
-    <div class="autocomplete">
-      <input type="text" id="destino" placeholder="Escribe una estación..." autocomplete="off">
-      <div class="sugg" id="sugg-destino"></div>
-    </div>
-
-    <div class="row">
-      <div>
-        <label for="fecha">Fecha</label>
-        <input type="date" id="fecha">
+    <div class="tabpanel active" id="panel-estacion">
+      <label for="origen">Origen</label>
+      <div class="autocomplete">
+        <input type="text" id="origen" placeholder="Escribe una estación..." autocomplete="off">
+        <div class="sugg" id="sugg-origen"></div>
       </div>
-      <div>
-        <label for="hora">Hora</label>
-        <input type="time" id="hora">
+      <button type="button" class="geobtn" id="btn-geo">📍 Usar mi ubicación</button>
+      <div class="geostatus" id="geo-status"></div>
+
+      <label for="destino">Destino</label>
+      <div class="autocomplete">
+        <input type="text" id="destino" placeholder="Escribe una estación..." autocomplete="off">
+        <div class="sugg" id="sugg-destino"></div>
       </div>
-      <div>
-        <label for="enlace-min">Enlace mín. (min)</label>
-        <input type="number" id="enlace-min" value="10" min="0" max="120" inputmode="numeric">
+
+      <div class="row">
+        <div>
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha">
+        </div>
+        <div>
+          <label for="hora">Hora</label>
+          <input type="time" id="hora">
+        </div>
+        <div>
+          <label for="enlace-min">Enlace mín. (min)</label>
+          <input type="number" id="enlace-min" value="10" min="0" max="120" inputmode="numeric">
+        </div>
       </div>
-    </div>
-    <div class="chk">
-      <input type="checkbox" id="todo-el-dia">
-      <label for="todo-el-dia" style="margin:0">Ver todo el día (ignorar la hora)</label>
+      <div class="chk">
+        <input type="checkbox" id="todo-el-dia">
+        <label for="todo-el-dia" style="margin:0">Ver todo el día (ignorar la hora)</label>
+      </div>
+
+      <button class="buscar" id="btn-buscar" disabled>Cargando datos…</button>
     </div>
 
-    <button class="buscar" id="btn-buscar" disabled>Cargando datos…</button>
+    <div class="tabpanel" id="panel-numero">
+      <label for="num-tren">Número de tren</label>
+      <input type="text" id="num-tren" placeholder="Ej. 03045" inputmode="numeric" autocomplete="off">
+      <button class="buscar" id="btn-buscar-numero" disabled>Cargando datos…</button>
+    </div>
+
+    <div class="tabpanel" id="panel-incidencias">
+      <label for="inc-ambito">Ámbito</label>
+      <select id="inc-ambito">
+        <option value="zona" selected>Mi zona (50 km)</option>
+        <option value="todas">Toda España</option>
+      </select>
+      <label for="inc-linea">Línea</label>
+      <select id="inc-linea">
+        <option value="">Todas las líneas</option>
+      </select>
+      <div class="geostatus" id="inc-status" style="margin-top:10px"></div>
+      <div id="inc-lista"></div>
+    </div>
   </div>
 
   <div id="estado"></div>
   <div id="resultados"></div>
   <div id="toast"></div>
 
-  <footer>Datos horarios públicos de los operadores ferroviarios españoles (alta velocidad, larga y media distancia, cercanías y regionales). Se muestran trenes directos; si no hay, se buscan automáticamente enlaces con 1 o 2 transbordos respetando el tiempo mínimo de enlace indicado (+10 min si el cambio es a pie entre estaciones próximas).</footer>
+  <footer>Datos horarios públicos de los operadores ferroviarios españoles (alta velocidad, larga y media distancia, cercanías y regionales). Se muestran trenes directos; si no hay, se buscan automáticamente enlaces con 1 o 2 transbordos respetando el tiempo mínimo de enlace indicado (+10 min si el cambio es a pie entre estaciones próximas). Con el enlace mínimo por defecto (10 min), entre dos líneas de Cercanías también se ofrecen enlaces más ajustados (5 min en la misma estación, 7,5 min andando a otra estación cercana).</footer>
 </div>
 
 <script>
@@ -363,7 +403,7 @@ function buscarDirectos(activos, oIdx, dIdx, minSel){
     }
 
     resultados.push({
-      cat, linea: DB.lineas[lineaIdx], numero, dias, fIni, fFin,
+      cat, linea: DB.lineas[lineaIdx], numero, dias, fIni, fFin, trip, posO, posD,
       depO, arrD, intermedias,
       origenNombre: DB.estaciones[oIdx][0], destinoNombre: DB.estaciones[dIdx][0],
       origenReal: DB.estaciones[stops[0]][0], destinoReal: DB.estaciones[stops[stops.length-3]][0],
@@ -374,6 +414,19 @@ function buscarDirectos(activos, oIdx, dIdx, minSel){
 }
 
 const ANDAR_MIN = 10; // minutos extra si el transbordo es entre estaciones distintas del mismo nodo
+
+// Entre dos líneas de Cercanías, con el enlace mínimo en su valor por defecto
+// (10 min), se ofrecen también enlaces más ajustados: 5 min si el cambio es en
+// la misma estación, 7,5 min si es andando a otra estación del mismo nodo.
+const CER_MISMA_PARADA = 5;
+const CER_ANDANDO = 7.5;
+
+function margenTransbordo(catPrev, catNext, minT, mismaParada){
+  if(minT === 10 && catPrev === 'CER' && catNext === 'CER'){
+    return mismaParada ? CER_MISMA_PARADA : CER_ANDANDO;
+  }
+  return minT + (mismaParada ? 0 : ANDAR_MIN);
+}
 
 // Cada "candidato" de llegada a un nodo lleva su itinerario acumulado:
 // {arr, depO, stIdx, legs:[{trip, dep, arr, oSt, dSt}]}
@@ -439,7 +492,8 @@ function expandirTransbordo(llegadas, activos, oIdx, dIdx, minT){
       if(!cands) continue;
       for(const c of cands){
         if(c.legs.some(l => l.trip===trip)) continue;
-        const margen = minT + (c.stIdx !== st ? ANDAR_MIN : 0);
+        const catPrev = c.legs[c.legs.length-1].trip[0];
+        const margen = margenTransbordo(catPrev, trip[0], minT, c.stIdx === st);
         if(c.arr + margen > dep) continue;
         if(!best || c.depO > best.depO){ best = c; bestBoard = {st, dep}; }
       }
@@ -469,7 +523,8 @@ function cerrarEnDestino(llegadas, activos, oIdx, dIdx, minT){
       if(!cands) continue;
       for(const c of cands){
         if(c.legs.some(l => l.trip===trip)) continue;
-        const margen = minT + (c.stIdx !== st ? ANDAR_MIN : 0);
+        const catPrev = c.legs[c.legs.length-1].trip[0];
+        const margen = margenTransbordo(catPrev, trip[0], minT, c.stIdx === st);
         if(c.arr + margen > depB) continue;   // no da tiempo al cambio
         // preferir salir del origen lo más tarde posible; a igualdad, menor espera
         if(!mejor || c.depO > mejor.c.depO ||
@@ -495,6 +550,479 @@ function cerrarEnDestino(llegadas, activos, oIdx, dIdx, minT){
   }
   res.sort((a,b) => a.depO - b.depO);
   return res.slice(0, 50);
+}
+
+// ---------- Incidencias en tiempo real ----------
+// Feeds GTFS-RT de alertas: RENFE Cercanías (JSON, sin CORS: solo llega a
+// través del puente nativo de la app Android) y FGC (.pb vía su portal de
+// datos abiertos, con CORS). Si ningún feed responde, la pestaña no aparece.
+const URL_ALERTAS_RENFE = 'https://gtfsrt.renfe.com/alerts.json';
+const URL_CATALOGO_FGC = 'https://dadesobertes.fgc.cat/api/explore/v2.1/catalog/datasets/alerts-gtfs_realtime/records?limit=1';
+const RADIO_INC_KM = 50; // radio de "mi zona" alrededor del dispositivo
+
+let ALERTAS = [];        // [{op, texto, lineas:Set(idx), estaciones:Set(idx)}]
+let alertasCargadas = 0; // timestamp de la última carga
+const feedsEstado = {CER: null, FGC: null}; // null=pendiente, true=ok, false=fallo
+
+function esc(s){ return String(s).replace(/[&<>]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch])); }
+
+let netSeq = 0;
+const netPend = {};
+window.__netCb = function(id, b64){
+  const cb = netPend[id]; delete netPend[id];
+  if(cb) cb(b64);
+};
+function fetchBytes(url){
+  if(window.AndroidNet && AndroidNet.fetch){
+    return new Promise(res => {
+      const id = String(++netSeq);
+      netPend[id] = b64 => {
+        if(b64 == null){ res(null); return; }
+        const bin = atob(b64);
+        const u = new Uint8Array(bin.length);
+        for(let i=0;i<bin.length;i++) u[i] = bin.charCodeAt(i);
+        res(u);
+      };
+      setTimeout(() => { if(netPend[id]){ delete netPend[id]; res(null); } }, 20000);
+      AndroidNet.fetch(url, id);
+    });
+  }
+  return fetch(url).then(r => r.ok ? r.arrayBuffer().then(b => new Uint8Array(b)) : null).catch(() => null);
+}
+
+// Decodificador mínimo de protobuf, suficiente para el feed de alertas GTFS-RT
+function pbCampos(buf, ini, fin){
+  const out = [];
+  let i = ini;
+  while(i < fin){
+    let clave = 0, s = 0;
+    while(true){ const b = buf[i++]; clave |= (b & 127) << s; if(b < 128) break; s += 7; }
+    const num = clave >>> 3, wire = clave & 7;
+    if(wire === 0){
+      let v = 0, e = 1;
+      while(true){ const b = buf[i++]; v += (b & 127) * e; if(b < 128) break; e *= 128; }
+      out.push({num, val: v});
+    } else if(wire === 2){
+      let len = 0, s2 = 0;
+      while(true){ const b = buf[i++]; len |= (b & 127) << s2; if(b < 128) break; s2 += 7; }
+      out.push({num, ini: i, fin: i + len});
+      i += len;
+    } else if(wire === 5){ i += 4; }
+    else if(wire === 1){ i += 8; }
+    else break;
+  }
+  return out;
+}
+const utf8 = new TextDecoder();
+function pbTexto(buf, c){ return utf8.decode(buf.subarray(c.ini, c.fin)); }
+
+function pbTraduccion(buf, c){
+  // TranslatedString: translation=1 {text=1, language=2}
+  for(const t of pbCampos(buf, c.ini, c.fin)){
+    if(t.num !== 1) continue;
+    for(const f of pbCampos(buf, t.ini, t.fin)) if(f.num === 1) return pbTexto(buf, f);
+  }
+  return '';
+}
+
+function decodificarAlertasPb(buf){
+  // FeedMessage.entity=2 > FeedEntity.alert=5 > Alert{active_period=1,
+  // informed_entity=5, header_text=10, description_text=11};
+  // EntitySelector{route_id=2, trip=4{route_id=5}, stop_id=5}; TimeRange{end=2}
+  const alertas = [];
+  for(const ent of pbCampos(buf, 0, buf.length)){
+    if(ent.num !== 2 || ent.ini === undefined) continue;
+    for(const c of pbCampos(buf, ent.ini, ent.fin)){
+      if(c.num !== 5) continue;
+      const a = {rutas: [], stops: [], fin: 0, texto: ''};
+      let desc = '';
+      for(const f of pbCampos(buf, c.ini, c.fin)){
+        if(f.num === 1 && f.ini !== undefined){
+          for(const p of pbCampos(buf, f.ini, f.fin)) if(p.num === 2) a.fin = Math.max(a.fin, p.val);
+        } else if(f.num === 5 && f.ini !== undefined){
+          for(const s of pbCampos(buf, f.ini, f.fin)){
+            if(s.num === 2 && s.ini !== undefined) a.rutas.push(pbTexto(buf, s));
+            else if(s.num === 5 && s.ini !== undefined) a.stops.push(pbTexto(buf, s));
+            else if(s.num === 4 && s.ini !== undefined){
+              for(const t of pbCampos(buf, s.ini, s.fin)) if(t.num === 5 && t.ini !== undefined) a.rutas.push(pbTexto(buf, t));
+            }
+          }
+        } else if(f.num === 10 && f.ini !== undefined) a.texto = pbTraduccion(buf, f);
+        else if(f.num === 11 && f.ini !== undefined) desc = pbTraduccion(buf, f);
+      }
+      if(!a.texto) a.texto = desc;
+      alertas.push(a);
+    }
+  }
+  return alertas;
+}
+
+function lineasDeRuta(rid){
+  if(rid in DB.rutas) return [DB.rutas[rid]];
+  // RENFE rota los route_id entre versiones del feed (10T0095C4 -> 10T0096C4):
+  // probar la clave estable "núcleo|nombre corto". El route_id de Cercanías es
+  // <núcleo:2><T><nnnn><línea>, así que la línea es lo que sigue al carácter 7.
+  const resto = rid.length > 7 ? rid.slice(7).toUpperCase() : '';
+  if(!resto) return [];
+  const pref = rid.slice(0,2) + '|';
+  const out = [];
+  for(const k in DB.rutas){
+    if(!k.startsWith(pref)) continue;
+    const corto = k.slice(3).toUpperCase();
+    // igual (C4A ~ C4a), o ramal de una alerta troncal (C8 -> C8a, C8b) pero
+    // sin confundir líneas distintas (R1 no debe casar con R11)
+    if(corto === resto ||
+       (corto.startsWith(resto) && (corto.charAt(resto.length) < '0' || corto.charAt(resto.length) > '9'))){
+      out.push(DB.rutas[k]);
+    }
+  }
+  return out;
+}
+
+function afinarAlerta(texto, lineas, ests){
+  // El feed de RENFE etiqueta algunas alertas con todas las líneas del núcleo;
+  // el propio texto permite afinar el ámbito real.
+  const soloEstacion = /inaccesible|accesibilidad|ascensor|escalera|aseo|vestibulo|pmr|permanecera cerrado|cerrado temporalmente/
+    .test(normaliza(texto));
+  // 1) Alertas de la propia estación ("...la estación de X se encuentra
+  //    inaccesible..."): convertir en alerta de esa estación concreta. Las de
+  //    circulación (demoras, obras...) conservan sus líneas aunque mencionen
+  //    una estación: el retraso viaja con el tren más allá de esa estación.
+  if(soloEstacion && !ests.length){
+    const m = normaliza(texto).match(/estacion de ([a-z0-9. -]{2,45})/);
+    if(m){
+      const chunk = m[1].trim();
+      let mejor = [], mejorLen = 0;
+      for(let i=0;i<estNombres.length;i++){
+        const n = estNombres[i];
+        if(n.length < 3) continue;
+        // nombre de estación al inicio del texto capturado (con límite de palabra)
+        if(chunk === n || (chunk.startsWith(n) && chunk.charAt(n.length) === ' ')){
+          if(n.length > mejorLen){ mejor = [i]; mejorLen = n.length; }
+          else if(n.length === mejorLen) mejor.push(i);
+        }
+      }
+      if(!mejor.length){
+        // el feed suele omitir el prefijo de ciudad ("Nuevos Ministerios" por
+        // "Madrid-Nuevos Ministerios"): probar como final del nombre
+        const palabras = chunk.split(' ');
+        for(let w = Math.min(5, palabras.length); w >= 1 && !mejor.length; w--){
+          const cand = palabras.slice(0, w).join(' ');
+          if(cand.length < 3) continue;
+          const hits = [];
+          for(let i=0;i<estNombres.length;i++){
+            const n = estNombres[i];
+            // el feed suele acortar el nombre por delante ("Nuevos Ministerios"
+            // por "Madrid-Nuevos Ministerios") o por detrás ("La Serna" por
+            // "La Serna-Fuenlabrada")
+            if(n === cand || n.endsWith('-' + cand) || n.endsWith(' ' + cand) ||
+               n.startsWith(cand + '-') || n.startsWith(cand + ' ')) hits.push(i);
+          }
+          if(hits.length >= 1 && hits.length <= 2) mejor = hits;
+        }
+      }
+      if(mejor.length) return {lineas: [], ests: mejor, soloEst: true};
+    }
+  }
+  // 2) Alertas con hashtags de línea (#MadC7 #MadC8...): quedarse solo con
+  //    las líneas citadas (si ninguna casa, se conserva el etiquetado original)
+  const tags = texto.match(/#[A-Za-z0-9]+/g);
+  if(tags && lineas.length){
+    const tagsU = tags.map(t => t.toUpperCase());
+    const filtradas = lineas.filter(l => {
+      const partes = DB.lineas[l].split(' ');
+      const corto = partes[partes.length - 1].toUpperCase();
+      const base = corto.replace(/[A-Z]+$/, ''); // C4a -> C4 (ramales)
+      return tagsU.some(t => t.endsWith(corto) || (base && base !== corto && t.endsWith(base)));
+    });
+    if(filtradas.length) lineas = filtradas;
+  }
+  return {lineas, ests, soloEst: soloEstacion && ests.length > 0};
+}
+
+function registrarAlerta(mapa, op, texto, lineas, estaciones, soloEst){
+  if(!texto || (!lineas.length && !estaciones.length)) return;
+  const clave = op + '|' + texto;
+  let a = mapa.get(clave);
+  if(!a){ a = {op, texto, lineas: new Set(), estaciones: new Set(), soloEst: !!soloEst}; mapa.set(clave, a); }
+  for(const l of lineas) a.lineas.add(l);
+  for(const e of estaciones) a.estaciones.add(e);
+}
+
+async function cargarAlertasRenfe(mapa){
+  feedsEstado.CER = false;
+  const bytes = await fetchBytes(URL_ALERTAS_RENFE);
+  if(!bytes) return;
+  let d;
+  try{ d = JSON.parse(utf8.decode(bytes)); }catch(e){ return; }
+  const ahora = Date.now()/1000;
+  for(const ent of (d.entity || [])){
+    try{
+      const al = ent.alert;
+      if(!al) continue;
+      const periodos = al.activePeriod || [];
+      if(periodos.length && periodos.every(p => p.end && Number(p.end) < ahora)) continue;
+      const tr = (al.descriptionText && al.descriptionText.translation) || [];
+      const esTr = tr.find(t => t.language === 'es') || tr[0];
+      const texto = esTr ? esTr.text : '';
+      const lineas = [], ests = [];
+      for(const ie of (al.informedEntity || [])){
+        if(ie.routeId) lineas.push(...lineasDeRuta(ie.routeId));
+        if(ie.stopId && ie.stopId in DB.codigos) ests.push(DB.codigos[ie.stopId]);
+      }
+      const fino = afinarAlerta(texto, lineas, ests);
+      registrarAlerta(mapa, 'CER', texto, fino.lineas, fino.ests, fino.soloEst);
+    }catch(e){ /* alerta malformada: se ignora sin perder el resto */ }
+  }
+  feedsEstado.CER = true;
+}
+
+async function cargarAlertasFgc(mapa){
+  // La URL del .pb cambia en cada actualización: se resuelve vía el catálogo
+  feedsEstado.FGC = false;
+  const cat = await fetchBytes(URL_CATALOGO_FGC);
+  if(!cat) return;
+  let url = null;
+  try{
+    const d = JSON.parse(utf8.decode(cat));
+    url = d.results && d.results[0] && d.results[0].file && d.results[0].file.url;
+  }catch(e){ return; }
+  if(!url) return;
+  const bytes = await fetchBytes(url);
+  if(!bytes) return;
+  const ahora = Date.now()/1000;
+  for(const a of decodificarAlertasPb(bytes)){
+    try{
+      if(a.fin && a.fin < ahora) continue;
+      const lineas = [], ests = [];
+      for(const rid of a.rutas) lineas.push(...lineasDeRuta(rid));
+      for(const sid of a.stops){
+        // el feed estático de FGC numera los andenes (PR1, PR2); las alertas
+        // usan el código de estación pelado (PR)
+        const k = sid in DB.codigos ? sid : ((sid + '1') in DB.codigos ? sid + '1' : null);
+        if(k) ests.push(DB.codigos[k]);
+      }
+      registrarAlerta(mapa, 'FGC', a.texto, lineas, ests);
+    }catch(e){ /* alerta malformada: se ignora sin perder el resto */ }
+  }
+  feedsEstado.FGC = true;
+}
+
+async function cargarIncidencias(){
+  if(!DB || !DB.rutas || !DB.codigos) return;
+  const mapa = new Map();
+  // cada feed capturado por separado: el fallo de uno no pierde el otro
+  await Promise.all([
+    cargarAlertasRenfe(mapa).catch(() => { feedsEstado.CER = false; }),
+    cargarAlertasFgc(mapa).catch(() => { feedsEstado.FGC = false; }),
+  ]);
+  ALERTAS = [...mapa.values()];
+  alertasCargadas = Date.now();
+  document.getElementById('tab-incidencias').hidden = ALERTAS.length === 0;
+}
+
+function avisoFeeds(){
+  const fallidos = [];
+  if(feedsEstado.CER === false) fallidos.push('RENFE Cercanías');
+  if(feedsEstado.FGC === false) fallidos.push('FGC');
+  if(!fallidos.length) return '';
+  let msg = ` No se pudieron cargar las incidencias de ${fallidos.join(' y ')}.`;
+  if(feedsEstado.CER === false && !(window.AndroidNet && AndroidNet.fetch)){
+    msg += ' El feed de RENFE solo es accesible desde la app Android (el navegador lo bloquea).';
+  }
+  return msg;
+}
+
+function alertasDeTrip(trip, ini, fin){
+  // ini/fin: posiciones (índices de parada) del tramo que se recorre; si no se
+  // pasan, se considera el recorrido completo del tren
+  if(!ALERTAS.length) return [];
+  const lin = trip[1], stops = trip[6], n = stops.length/3;
+  const p0 = (ini >= 0 && ini !== undefined) ? ini : 0;
+  const p1 = (fin >= 0 && fin !== undefined) ? fin : n - 1;
+  const out = [];
+  for(const a of ALERTAS){
+    // alertas de la propia estación (accesibilidad, cierres): solo si el tramo
+    // recorrido pasa por ella; las de circulación casan por línea (el retraso
+    // originado en cualquier estación de la línea viaja con el tren)
+    let afecta = !a.soloEst && a.lineas.has(lin);
+    if(!afecta && a.estaciones.size){
+      for(let p=p0;p<=p1;p++){ if(a.estaciones.has(stops[p*3])){ afecta = true; break; } }
+    }
+    if(afecta) out.push(a);
+  }
+  return out;
+}
+
+function incidenciasListaHTML(als){
+  if(!als.length) return '';
+  const bloques = als.map(a => `<div class="incidencia">⚠️ ${esc(a.texto)}</div>`);
+  if(bloques.length <= 2) return bloques.join('');
+  return bloques[0] + bloques[1] +
+    `<details><summary>⚠️ ${bloques.length - 2} incidencia(s) más</summary>${bloques.slice(2).join('')}</details>`;
+}
+
+function incidenciasHTML(trip, ini, fin){
+  return incidenciasListaHTML(alertasDeTrip(trip, ini, fin));
+}
+
+let posDispositivo = null;
+function obtenerPosicion(){
+  return new Promise(res => {
+    if(posDispositivo){ res(posDispositivo); return; }
+    if(!navigator.geolocation){ res(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => { posDispositivo = {lat: p.coords.latitude, lon: p.coords.longitude}; res(posDispositivo); },
+      () => res(null), {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000});
+  });
+}
+
+function lineasDeEstaciones(ests){
+  // De las líneas con alguna alerta, las que paran en alguna de esas estaciones
+  const lineasAlerta = new Set();
+  for(const a of ALERTAS) for(const l of a.lineas) lineasAlerta.add(l);
+  const lineas = new Set();
+  for(const trip of DB.trips){
+    if(!lineasAlerta.has(trip[1]) || lineas.has(trip[1])) continue;
+    const stops = trip[6];
+    for(let p=0;p<stops.length;p+=3){ if(ests.has(stops[p])){ lineas.add(trip[1]); break; } }
+  }
+  return lineas;
+}
+
+function lineasCercaniasDe(ests){
+  // Líneas de Cercanías/FGC que paran en alguna de las estaciones dadas
+  // (ests = null: todas las líneas de Cercanías/FGC)
+  const out = new Set();
+  for(const trip of DB.trips){
+    if(trip[0] !== 'CER' && trip[0] !== 'FGC') continue;
+    if(out.has(trip[1])) continue;
+    if(!ests){ out.add(trip[1]); continue; }
+    const stops = trip[6];
+    for(let p=0;p<stops.length;p+=3){ if(ests.has(stops[p])){ out.add(trip[1]); break; } }
+  }
+  return out;
+}
+
+const estacionesLineaCache = {};
+function estacionesDeLinea(L){
+  if(estacionesLineaCache[L]) return estacionesLineaCache[L];
+  const s = new Set();
+  for(const trip of DB.trips){
+    if(trip[1] !== L) continue;
+    const stops = trip[6];
+    for(let p=0;p<stops.length;p+=3) s.add(stops[p]);
+  }
+  return estacionesLineaCache[L] = s;
+}
+
+function poblarLineas(ests){
+  // Rellena el filtro de línea con las líneas de Cercanías/FGC del ámbito
+  // actual, conservando la selección si sigue disponible
+  const sel = document.getElementById('inc-linea');
+  const previa = sel.value;
+  const lineas = [...lineasCercaniasDe(ests)]
+    .sort((a,b) => DB.lineas[a].localeCompare(DB.lineas[b]));
+  sel.innerHTML = '<option value="">Todas las líneas</option>' +
+    lineas.map(l => `<option value="${l}">${esc(DB.lineas[l])}</option>`).join('');
+  if(previa && [...sel.options].some(o => o.value === previa)) sel.value = previa;
+}
+
+function poblarAmbitos(){
+  // Rellena el selector con las CCAA y provincias que tienen estaciones
+  if(!DB.provincias || !DB.provincias.length) return;
+  const sel = document.getElementById('inc-ambito');
+  const usadas = new Set();
+  for(const e of DB.estaciones) if(e[3] >= 0) usadas.add(e[3]);
+  const ccaas = [...new Set([...usadas].map(p => DB.provincias[p][1]))].sort((a,b) => a.localeCompare(b));
+  const gC = document.createElement('optgroup');
+  gC.label = 'Comunidad autónoma';
+  for(const c of ccaas){
+    const o = document.createElement('option');
+    o.value = 'c:' + c; o.textContent = c;
+    gC.appendChild(o);
+  }
+  sel.appendChild(gC);
+  const gP = document.createElement('optgroup');
+  gP.label = 'Provincia';
+  const provs = [...usadas].sort((a,b) => DB.provincias[a][0].localeCompare(DB.provincias[b][0]));
+  for(const p of provs){
+    const o = document.createElement('option');
+    o.value = 'p:' + p; o.textContent = DB.provincias[p][0];
+    gP.appendChild(o);
+  }
+  sel.appendChild(gP);
+}
+
+async function renderIncidencias(){
+  const st = document.getElementById('inc-status');
+  const lista = document.getElementById('inc-lista');
+  lista.innerHTML = '';
+  if(Date.now() - alertasCargadas > 120000) await cargarIncidencias();
+  const modo = document.getElementById('inc-ambito').value;
+  let locales, ambito, estsAmbito = null;
+  if(modo === 'todas'){
+    locales = ALERTAS;
+    ambito = 'en toda España';
+  } else {
+    let ests;
+    if(modo === 'zona'){
+      st.textContent = 'Obteniendo tu ubicación...';
+      const pos = await obtenerPosicion();
+      if(!pos){
+        st.textContent = 'No se pudo obtener tu ubicación. Elige arriba otro ámbito para ver incidencias.';
+        return;
+      }
+      ests = new Set();
+      DB.estaciones.forEach((e, i) => {
+        if(e[1] != null && haversine(pos.lat, pos.lon, e[1], e[2]) <= RADIO_INC_KM) ests.add(i);
+      });
+      ambito = 'en tu zona';
+    } else if(modo.slice(0,2) === 'p:'){
+      const p = parseInt(modo.slice(2), 10);
+      ests = new Set();
+      DB.estaciones.forEach((e, i) => { if(e[3] === p) ests.add(i); });
+      ambito = 'en ' + DB.provincias[p][0];
+    } else {
+      const c = modo.slice(2);
+      ests = new Set();
+      DB.estaciones.forEach((e, i) => { if(e[3] >= 0 && DB.provincias[e[3]][1] === c) ests.add(i); });
+      ambito = 'en ' + c;
+    }
+    const lineas = lineasDeEstaciones(ests);
+    locales = ALERTAS.filter(a => {
+      for(const l of a.lineas) if(lineas.has(l)) return true;
+      for(const e of a.estaciones) if(ests.has(e)) return true;
+      return false;
+    });
+    estsAmbito = ests;
+  }
+  poblarLineas(estsAmbito);
+  const lsel = document.getElementById('inc-linea').value;
+  if(lsel !== ''){
+    const L = parseInt(lsel, 10);
+    const estsL = estacionesDeLinea(L);
+    locales = locales.filter(a => a.lineas.has(L) || [...a.estaciones].some(e => estsL.has(e)));
+    ambito += ' · ' + DB.lineas[L];
+  }
+  if(!locales.length){
+    st.textContent = 'Sin incidencias ' + ambito + '.' + avisoFeeds();
+    return;
+  }
+  st.textContent = `${locales.length} incidencia(s) ${ambito}:` + avisoFeeds();
+  for(const a of locales){
+    const badge = a.op === 'FGC' ? 'FGC' : 'CER';
+    const nombres = [...a.lineas].map(l => DB.lineas[l]).sort().join(' · ');
+    const div = document.createElement('div');
+    div.className = 'resultado';
+    div.innerHTML = `
+      <div class="rescab">
+        <span class="badge ${badge}">${badge}</span>
+        <span class="linea">${esc(nombres)}</span>
+      </div>
+      <div class="meta">${esc(a.texto)}</div>`;
+    lista.appendChild(div);
+  }
 }
 
 // ---------- Compartir ----------
@@ -596,9 +1124,75 @@ function pintarDirecto(resEl, r){
     ${r.intermedias.length ? `<details><summary>${r.intermedias.length} parada(s) intermedia(s)</summary>
       ${r.intermedias.map(i => `<div class="parada"><span>${i.nombre}</span><span>${fmtHora(i.llegada)} / ${fmtHora(i.salida)}</span></div>`).join('')}
       </details>` : ''}
+    ${incidenciasHTML(r.trip, r.posO, r.posD)}
   `;
   div.querySelector('.sharebtn').addEventListener('click', () => compartir(textoDirecto(r)));
   resEl.appendChild(div);
+}
+
+function normalizaNumeroTren(s){
+  return String(s).trim().replace(/^0+(?=\d)/, '');
+}
+
+function pintarTren(resEl, trip){
+  const [cat, lineaIdx, numero, dias, fIni, fFin, stops] = trip;
+  const n = stops.length/3;
+  const origenNombre = DB.estaciones[stops[0]][0];
+  const destinoNombre = DB.estaciones[stops[(n-1)*3]][0];
+  const salida = stops[2];
+  const llegada = stops[(n-1)*3+1];
+  const intermedias = [];
+  for(let p=1;p<n-1;p++){
+    intermedias.push({nombre: DB.estaciones[stops[p*3]][0], llegada: stops[p*3+1], salida: stops[p*3+2]});
+  }
+  const dur = (llegada>=0 && salida>=0) ? llegada - salida : null;
+  const dtx = durTxt(dur);
+  const div = document.createElement('div');
+  div.className = 'resultado';
+  div.innerHTML = `
+    <div class="rescab">
+      <span class="badge ${cat}">${cat}</span>
+      <span class="tren">${trenLabel(numero)}</span>
+      <span class="linea">${DB.lineas[lineaIdx]}</span>
+    </div>
+    <div class="horas">
+      <div><span class="hh">${fmtHora(salida)}</span><span class="st">${origenNombre}</span></div>
+      <span class="flecha">→</span>
+      <div><span class="hh">${fmtHora(llegada)}</span><span class="st">${destinoNombre}</span></div>
+      ${dtx ? `<span class="linea">(${dtx})</span>` : ''}
+    </div>
+    <div class="meta">
+      Circula: ${diasTexto(dias)} · Vigencia: ${fmtFecha(fIni)} – ${fmtFecha(fFin)}
+    </div>
+    ${intermedias.length ? `<details open><summary>${intermedias.length} parada(s) intermedia(s)</summary>
+      ${intermedias.map(i => `<div class="parada"><span>${i.nombre}</span><span>${fmtHora(i.llegada)} / ${fmtHora(i.salida)}</span></div>`).join('')}
+      </details>` : ''}
+    ${incidenciasHTML(trip)}
+  `;
+  resEl.appendChild(div);
+}
+
+function buscarPorNumero(){
+  const estadoEl = document.getElementById('estado');
+  const resEl = document.getElementById('resultados');
+  resEl.innerHTML = '';
+
+  const q = normalizaNumeroTren(document.getElementById('num-tren').value);
+  if(!q){
+    estadoEl.textContent = 'Indica un número de tren.';
+    return;
+  }
+
+  const encontrados = DB.trips.filter(trip => trip[2] && normalizaNumeroTren(trip[2]) === q);
+  encontrados.sort((a,b) => a[4] - b[4]);
+
+  if(!encontrados.length){
+    estadoEl.textContent = `No se ha encontrado ningún tren con el número ${q}.`;
+    return;
+  }
+
+  estadoEl.textContent = `${encontrados.length} circulación(es) encontrada(s) para el tren ${q}.`;
+  for(const trip of encontrados) pintarTren(resEl, trip);
 }
 
 function pintarConexion(resEl, c){
@@ -615,6 +1209,19 @@ function pintarConexion(resEl, c){
     }
     partes.push(legHTML(l.trip, l.dep, l.arr, DB.estaciones[l.oSt][0], DB.estaciones[l.dSt][0]));
   }
+  // incidencias de todos los tramos (cada uno limitado a su recorrido), sin duplicados
+  const alSet = new Set();
+  for(const l of c.legs){
+    const stops = l.trip[6];
+    let ini = -1, fin = -1;
+    for(let p=0;p<stops.length/3;p++){
+      const st = stops[p*3];
+      if(st === l.oSt && ini === -1) ini = p;
+      else if(st === l.dSt && ini !== -1){ fin = p; break; }
+    }
+    for(const a of alertasDeTrip(l.trip, ini, fin)) alSet.add(a);
+  }
+  partes.push(incidenciasListaHTML([...alSet]));
   partes.push(`<div class="resfoot"><span class="meta">Duración total: ${durTxt(c.arrD - c.depO)}</span></div>`);
   const div = document.createElement('div');
   div.className = 'resultado';
@@ -696,6 +1303,24 @@ function buscar(){
 }
 
 document.getElementById('btn-buscar').addEventListener('click', buscar);
+document.getElementById('btn-buscar-numero').addEventListener('click', buscarPorNumero);
+document.getElementById('inc-ambito').addEventListener('change', renderIncidencias);
+document.getElementById('inc-linea').addEventListener('change', renderIncidencias);
+document.getElementById('num-tren').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') buscarPorNumero();
+});
+
+// ---------- Pestañas ----------
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t===tab));
+    document.querySelectorAll('.tabpanel').forEach(p =>
+      p.classList.toggle('active', p.id === 'panel-' + tab.dataset.tab));
+    document.getElementById('estado').textContent = '';
+    document.getElementById('resultados').innerHTML = '';
+    if(tab.dataset.tab === 'incidencias') renderIncidencias();
+  });
+});
 
 // ---------- Inicialización ----------
 function hoyLocal(){
@@ -718,6 +1343,11 @@ function ahoraLocal(){
     const btn = document.getElementById('btn-buscar');
     btn.disabled = false;
     btn.textContent = 'Buscar trenes';
+    const btnNum = document.getElementById('btn-buscar-numero');
+    btnNum.disabled = false;
+    btnNum.textContent = 'Buscar tren';
+    poblarAmbitos();
+    cargarIncidencias(); // en segundo plano; si no hay red, la pestaña no aparece
   }catch(e){
     document.getElementById('estado').textContent = 'Error al cargar los datos: ' + e.message;
     console.error(e);
