@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.provider.CalendarContract;
 import android.util.Base64;
 import android.webkit.GeolocationPermissions;
 import android.webkit.JavascriptInterface;
@@ -68,6 +69,23 @@ public class MainActivity extends Activity {
                 startActivity(Intent.createChooser(i, "Compartir itinerario"));
             }
         }, "AndroidShare");
+
+        // Puente para el botón "Calendario" del HTML: abre el editor de eventos
+        // del calendario con el itinerario precargado (el usuario confirma allí)
+        wv.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void evento(String titulo, String desc, String iniMs, String finMs) {
+                try {
+                    Intent i = new Intent(Intent.ACTION_INSERT)
+                            .setData(CalendarContract.Events.CONTENT_URI)
+                            .putExtra(CalendarContract.Events.TITLE, titulo)
+                            .putExtra(CalendarContract.Events.DESCRIPTION, desc)
+                            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, Long.parseLong(iniMs))
+                            .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, Long.parseLong(finMs));
+                    startActivity(i);
+                } catch (Exception e) { /* sin app de calendario: no se hace nada */ }
+            }
+        }, "AndroidCal");
 
         // Puente de red para las incidencias en tiempo real: el JS pide una URL
         // https y recibe el cuerpo en base64 vía window.__netCb(id, b64|null).

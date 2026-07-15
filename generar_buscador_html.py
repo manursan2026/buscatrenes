@@ -8,6 +8,7 @@ payload de datos generado por build_buscador_data.py (`buscador_data.b64`).
 No requiere red ni build steps adicionales: solo lee el .b64 y escribe el
 HTML final con la plantilla (CSS+JS) embebida abajo.
 """
+import datetime
 import pathlib
 
 B64_PATH = "buscador_data.b64"
@@ -108,11 +109,11 @@ TEMPLATE = """<!DOCTYPE html>
     border-left:3px solid var(--accent);background:rgba(59,130,246,.07);
     border-radius:8px;font-size:.82rem;color:var(--muted)}
   .transbordo b{color:var(--text)}
-  .tabs{display:flex;gap:8px;margin-bottom:16px}
-  .tab{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);
-    background:var(--panel2);color:var(--muted);font-size:.82rem;font-weight:700;
-    cursor:pointer;text-align:center}
-  .tab.active{background:rgba(59,130,246,.15);border-color:var(--accent);color:var(--text)}
+  .tabs{display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap}
+  .tab{flex:1 1 auto;padding:10px 4px;border-radius:10px;border:1px solid #2a4a6e;
+    background:#16324f;color:#b9cde4;font-size:.75rem;font-weight:700;
+    cursor:pointer;text-align:center;white-space:nowrap}
+  .tab.active{background:rgba(59,130,246,.3);border-color:var(--accent);color:#fff}
   .tab[hidden]{display:none}
   .tabpanel{display:none}
   .tabpanel.active{display:block}
@@ -124,6 +125,32 @@ TEMPLATE = """<!DOCTYPE html>
   .leg + .leg{border-top:none}
   footer{color:var(--muted);font-size:.72rem;text-align:center;margin-top:28px;
     opacity:.75;line-height:1.5}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chips:empty{display:none}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);
+    border:1px solid var(--border);border-radius:999px;padding:6px 11px;
+    font-size:.78rem;color:var(--text);cursor:pointer;max-width:100%}
+  .chip:active{background:#2f4356}
+  .chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .fav{color:var(--muted);font-size:.95rem;line-height:1}
+  .chip .fav.on{color:#f0b429}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .filtros:empty{display:none}
+  .fchip{border:1px solid var(--border);background:var(--panel2);color:var(--text);
+    border-radius:999px;padding:6px 12px;font-size:.75rem;font-weight:700;cursor:pointer}
+  .fchip.off{opacity:.4}
+  .salida{border-bottom:1px dashed var(--border);padding:7px 0;font-size:.88rem}
+  .salida:last-child{border-bottom:none}
+  .salida summary{display:flex;align-items:center;gap:9px;cursor:pointer;list-style:none;color:inherit}
+  .salida summary::-webkit-details-marker{display:none}
+  .salida .hh{font-weight:800;font-variant-numeric:tabular-nums}
+  .salida .dest{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .salida .linea{font-size:.72rem;max-width:34%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .salida .badge{font-size:.62rem;padding:2px 8px}
+  .salida .cuerpo{margin-top:6px}
+  #aviso-datos{display:none;margin:0 0 14px;padding:9px 12px;line-height:1.45;
+    border-left:3px solid #f0b429;background:rgba(240,180,41,.08);
+    border-radius:8px;font-size:.8rem;color:var(--muted)}
   @media (min-width:600px){ .wrap{padding-top:26px} }
 </style>
 </head>
@@ -131,14 +158,18 @@ TEMPLATE = """<!DOCTYPE html>
 <div class="wrap">
   <h1>🚆 BuscaTrenes</h1>
 
+  <div id="aviso-datos"></div>
+
   <div class="tabs">
-    <button type="button" class="tab active" id="tab-estacion" data-tab="estacion">Por estación</button>
-    <button type="button" class="tab" id="tab-numero" data-tab="numero">Por número de tren</button>
+    <button type="button" class="tab active" id="tab-estacion" data-tab="estacion">Trayecto</button>
+    <button type="button" class="tab" id="tab-salidas" data-tab="salidas">Salidas</button>
+    <button type="button" class="tab" id="tab-numero" data-tab="numero">Nº tren</button>
     <button type="button" class="tab" id="tab-incidencias" data-tab="incidencias" hidden>⚠️ Incidencias</button>
   </div>
 
   <div class="card">
     <div class="tabpanel active" id="panel-estacion">
+      <div class="chips" id="chips-trayectos"></div>
       <label for="origen">Origen</label>
       <div class="autocomplete">
         <input type="text" id="origen" placeholder="Escribe una estación..." autocomplete="off">
@@ -175,6 +206,27 @@ TEMPLATE = """<!DOCTYPE html>
       <button class="buscar" id="btn-buscar" disabled>Cargando datos…</button>
     </div>
 
+    <div class="tabpanel" id="panel-salidas">
+      <label for="sal-estacion">Estación</label>
+      <div class="autocomplete">
+        <input type="text" id="sal-estacion" placeholder="Escribe una estación..." autocomplete="off">
+        <div class="sugg" id="sugg-sal"></div>
+      </div>
+      <button type="button" class="geobtn" id="btn-geo-sal">📍 Usar mi ubicación</button>
+      <div class="geostatus" id="sal-geo-status"></div>
+      <div class="row">
+        <div>
+          <label for="sal-fecha">Fecha</label>
+          <input type="date" id="sal-fecha">
+        </div>
+        <div>
+          <label for="sal-hora">Desde las</label>
+          <input type="time" id="sal-hora">
+        </div>
+      </div>
+      <button class="buscar" id="btn-salidas" disabled>Cargando datos…</button>
+    </div>
+
     <div class="tabpanel" id="panel-numero">
       <label for="num-tren">Número de tren</label>
       <input type="text" id="num-tren" placeholder="Ej. 03045" inputmode="numeric" autocomplete="off">
@@ -197,14 +249,16 @@ TEMPLATE = """<!DOCTYPE html>
   </div>
 
   <div id="estado"></div>
+  <div class="filtros" id="filtros"></div>
   <div id="resultados"></div>
   <div id="toast"></div>
 
-  <footer>Datos horarios públicos de los operadores ferroviarios españoles (alta velocidad, larga y media distancia, cercanías y regionales). Se muestran trenes directos; si no hay, se buscan automáticamente enlaces con 1 o 2 transbordos respetando el tiempo mínimo de enlace indicado (+10 min si el cambio es a pie entre estaciones próximas). Con el enlace mínimo por defecto (10 min), entre dos líneas de Cercanías también se ofrecen enlaces más ajustados (5 min en la misma estación, 7,5 min andando a otra estación cercana).</footer>
+  <footer>Datos horarios públicos de los operadores ferroviarios españoles (alta velocidad, larga y media distancia, cercanías y regionales). Se muestran trenes directos; si no hay, se buscan automáticamente enlaces con 1 o 2 transbordos respetando el tiempo mínimo de enlace indicado (+10 min si el cambio es a pie entre estaciones próximas). Con el enlace mínimo por defecto (10 min), entre dos líneas de Cercanías también se ofrecen enlaces más ajustados (5 min en la misma estación, 7,5 min andando a otra estación cercana).<span id="fecha-datos"></span></footer>
 </div>
 
 <script>
 const DATA_B64 = "__DATA_B64__";
+const DATA_FECHA = "__DATA_FECHA__"; // YYYY-MM-DD, fecha de extracción de los horarios
 let DB = null; // {estaciones, lineas, trips}
 let estNombres = []; // nombres en minusculas sin acentos, paralelo a DB.estaciones
 
@@ -313,6 +367,72 @@ function resolverEstacion(inputId){
   return i>=0 ? i : -1;
 }
 
+// ---------- Favoritos y búsquedas recientes ----------
+// Se guardan por NOMBRE de estación (no por índice): los índices cambian
+// cuando se actualiza el payload de datos.
+const LS_FAV = 'bt_favoritos', LS_REC = 'bt_recientes';
+function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)) || []; }catch(e){ return []; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+const mismoPar = (a, b) => a[0] === b[0] && a[1] === b[1];
+
+function guardarReciente(o, d){
+  const par = [o, d];
+  if(!lsGet(LS_FAV).some(p => mismoPar(p, par))){
+    const rec = lsGet(LS_REC).filter(p => !mismoPar(p, par));
+    rec.unshift(par);
+    lsSet(LS_REC, rec.slice(0, 5));
+  }
+  renderChips();
+}
+
+function toggleFavorito(par){
+  let fav = lsGet(LS_FAV);
+  if(fav.some(p => mismoPar(p, par))){
+    fav = fav.filter(p => !mismoPar(p, par));
+  } else {
+    fav.unshift(par);
+    fav = fav.slice(0, 8);
+    lsSet(LS_REC, lsGet(LS_REC).filter(p => !mismoPar(p, par)));
+  }
+  lsSet(LS_FAV, fav);
+  renderChips();
+}
+
+function setEstacion(inputId, nombre){
+  const input = document.getElementById(inputId);
+  input.value = nombre;
+  const i = estNombres.indexOf(normaliza(nombre));
+  input.dataset.selIdx = i >= 0 ? String(i) : '';
+}
+
+function renderChips(){
+  const cont = document.getElementById('chips-trayectos');
+  cont.innerHTML = '';
+  const pares = lsGet(LS_FAV).map(p => [p, true]).concat(lsGet(LS_REC).map(p => [p, false]));
+  for(const [par, esFav] of pares){
+    // solo trayectos cuyas estaciones sigan existiendo tras actualizar datos
+    if(estNombres.indexOf(normaliza(par[0])) < 0 || estNombres.indexOf(normaliza(par[1])) < 0) continue;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    const t = document.createElement('span');
+    t.className = 't';
+    t.textContent = par[0] + ' → ' + par[1];
+    const star = document.createElement('span');
+    star.className = 'fav' + (esFav ? ' on' : '');
+    star.textContent = esFav ? '★' : '☆';
+    star.title = esFav ? 'Quitar de favoritos' : 'Guardar como favorito';
+    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorito(par); });
+    chip.appendChild(t);
+    chip.appendChild(star);
+    chip.addEventListener('click', () => {
+      setEstacion('origen', par[0]);
+      setEstacion('destino', par[1]);
+      buscar();
+    });
+    cont.appendChild(chip);
+  }
+}
+
 // ---------- Geolocalización ----------
 function haversine(lat1,lon1,lat2,lon2){
   const R=6371, toRad=x=>x*Math.PI/180;
@@ -321,33 +441,37 @@ function haversine(lat1,lon1,lat2,lon2){
   return 2*R*Math.asin(Math.sqrt(a));
 }
 
-document.getElementById('btn-geo').addEventListener('click', () => {
-  const st = document.getElementById('geo-status');
-  if(!navigator.geolocation){
-    st.textContent = 'Tu navegador no soporta geolocalización.';
-    return;
-  }
-  st.textContent = 'Localizando...';
-  navigator.geolocation.getCurrentPosition((pos) => {
-    const {latitude, longitude} = pos.coords;
-    let mejor=-1, mejorD=Infinity;
-    DB.estaciones.forEach((e,i) => {
-      if(e[1]==null || e[2]==null) return;
-      const d = haversine(latitude, longitude, e[1], e[2]);
-      if(d<mejorD){ mejorD=d; mejor=i; }
-    });
-    if(mejor>=0){
-      const input = document.getElementById('origen');
-      input.value = DB.estaciones[mejor][0];
-      input.dataset.selIdx = mejor;
-      st.textContent = `Estación más cercana: ${DB.estaciones[mejor][0]} (${mejorD.toFixed(1)} km)`;
-    } else {
-      st.textContent = 'No se pudo determinar la estación más cercana.';
+function configurarGeo(btnId, statusId, inputId){
+  document.getElementById(btnId).addEventListener('click', () => {
+    const st = document.getElementById(statusId);
+    if(!navigator.geolocation){
+      st.textContent = 'Tu navegador no soporta geolocalización.';
+      return;
     }
-  }, (err) => {
-    st.textContent = 'No se pudo obtener tu ubicación (' + err.message + ').';
-  }, {enableHighAccuracy:true, timeout:10000});
-});
+    st.textContent = 'Localizando...';
+    navigator.geolocation.getCurrentPosition((pos) => {
+      const {latitude, longitude} = pos.coords;
+      let mejor=-1, mejorD=Infinity;
+      DB.estaciones.forEach((e,i) => {
+        if(e[1]==null || e[2]==null) return;
+        const d = haversine(latitude, longitude, e[1], e[2]);
+        if(d<mejorD){ mejorD=d; mejor=i; }
+      });
+      if(mejor>=0){
+        const input = document.getElementById(inputId);
+        input.value = DB.estaciones[mejor][0];
+        input.dataset.selIdx = mejor;
+        st.textContent = `Estación más cercana: ${DB.estaciones[mejor][0]} (${mejorD.toFixed(1)} km)`;
+      } else {
+        st.textContent = 'No se pudo determinar la estación más cercana.';
+      }
+    }, (err) => {
+      st.textContent = 'No se pudo obtener tu ubicación (' + err.message + ').';
+    }, {enableHighAccuracy:true, timeout:10000});
+  });
+}
+configurarGeo('btn-geo', 'geo-status', 'origen');
+configurarGeo('btn-geo-sal', 'sal-geo-status', 'sal-estacion');
 
 // ---------- Búsqueda ----------
 const DIAS_ES = ['L','M','X','J','V','S','D'];
@@ -1054,6 +1178,39 @@ function fechaSeleccionada(){
   return f ? `${f.slice(8,10)}/${f.slice(5,7)}/${f.slice(0,4)}` : '';
 }
 
+// ---------- Añadir al calendario ----------
+// En la app Android abre el editor de eventos del calendario (puente
+// AndroidCal); en navegador descarga un .ics como alternativa.
+function aCalendario(titulo, desc, depMin, arrMin){
+  const fecha = (ultimaBusqueda && ultimaBusqueda.fechaISO) || document.getElementById('fecha').value;
+  if(!fecha) return;
+  const base = new Date(fecha + 'T00:00:00').getTime();
+  const ini = base + depMin*60000;
+  const fin = base + (arrMin >= 0 ? arrMin : depMin + 60)*60000;
+  if(window.AndroidCal && AndroidCal.evento){
+    AndroidCal.evento(titulo, desc, String(ini), String(fin));
+    return;
+  }
+  const f = t => {
+    const d = new Date(t), p = x => String(x).padStart(2,'0');
+    return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + 'T' + p(d.getHours()) + p(d.getMinutes()) + '00';
+  };
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//BuscaTrenes//ES','BEGIN:VEVENT',
+    'UID:' + Date.now() + '@buscatrenes',
+    'DTSTART:' + f(ini),
+    'DTEND:' + f(fin),
+    'SUMMARY:' + titulo,
+    'DESCRIPTION:' + desc.split('\\n').join('\\\\n'),
+    'END:VEVENT','END:VCALENDAR'].join('\\r\\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ics], {type:'text/calendar'}));
+  a.download = 'tren.ics';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  toast('Evento de calendario descargado (.ics)');
+}
+
 function textoDirecto(r){
   const dur = r.arrD >= 0 ? durTxt(r.arrD - r.depO) : '';
   return `🚆 ${fechaSeleccionada()}\\n` +
@@ -1109,7 +1266,8 @@ function pintarDirecto(resEl, r){
       <span class="badge ${r.cat}">${r.cat}</span>
       <span class="tren">${trenLabel(r.numero)}</span>
       <span class="linea">${r.linea}</span>
-      <button type="button" class="sharebtn">📤 Compartir</button>
+      <button type="button" class="sharebtn calbtn" style="margin-left:auto">🗓</button>
+      <button type="button" class="sharebtn" style="margin-left:0">📤 Compartir</button>
     </div>
     <div class="horas">
       <div><span class="hh">${fmtHora(r.depO)}</span><span class="st">${r.origenNombre}</span></div>
@@ -1126,7 +1284,9 @@ function pintarDirecto(resEl, r){
       </details>` : ''}
     ${incidenciasHTML(r.trip, r.posO, r.posD)}
   `;
-  div.querySelector('.sharebtn').addEventListener('click', () => compartir(textoDirecto(r)));
+  div.querySelector('.calbtn').addEventListener('click', () =>
+    aCalendario(`Tren ${r.origenNombre} → ${r.destinoNombre}`, textoDirecto(r), r.depO, r.arrD));
+  div.querySelector('.sharebtn:not(.calbtn)').addEventListener('click', () => compartir(textoDirecto(r)));
   resEl.appendChild(div);
 }
 
@@ -1175,7 +1335,7 @@ function pintarTren(resEl, trip){
 function buscarPorNumero(){
   const estadoEl = document.getElementById('estado');
   const resEl = document.getElementById('resultados');
-  resEl.innerHTML = '';
+  limpiarResultados();
 
   const q = normalizaNumeroTren(document.getElementById('num-tren').value);
   if(!q){
@@ -1226,21 +1386,87 @@ function pintarConexion(resEl, c){
   const div = document.createElement('div');
   div.className = 'resultado';
   div.innerHTML = partes.join('');
+  const btnCal = document.createElement('button');
+  btnCal.type = 'button';
+  btnCal.className = 'sharebtn';
+  btnCal.style.marginLeft = '0';
+  btnCal.textContent = '🗓';
+  btnCal.addEventListener('click', () => {
+    const o = DB.estaciones[c.legs[0].oSt][0], d = DB.estaciones[c.legs[c.legs.length-1].dSt][0];
+    aCalendario(`Tren ${o} → ${d} (con transbordo)`, textoConexion(c), c.depO, c.arrD);
+  });
+  div.querySelector('.resfoot').appendChild(btnCal);
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'sharebtn';
+  btn.style.marginLeft = '0';
   btn.textContent = '📤 Compartir';
   btn.addEventListener('click', () => compartir(textoConexion(c)));
   div.querySelector('.resfoot').appendChild(btn);
   resEl.appendChild(div);
 }
 
+// ---------- Filtros de resultados por categoría ----------
+let ultimaBusqueda = null; // {tipo:'directos'|'con1'|'con2', items, minT, fechaISO}
+let catsActivas = null;    // Set de categorías visibles; null = todas
+
+function limpiarResultados(){
+  ultimaBusqueda = null;
+  catsActivas = null;
+  document.getElementById('filtros').innerHTML = '';
+  document.getElementById('resultados').innerHTML = '';
+}
+
+function catsDeItem(it, tipo){
+  return tipo === 'directos' ? [it.cat] : it.legs.map(l => l.trip[0]);
+}
+
+function renderResultados(){
+  const estadoEl = document.getElementById('estado');
+  const resEl = document.getElementById('resultados');
+  const filtEl = document.getElementById('filtros');
+  resEl.innerHTML = '';
+  filtEl.innerHTML = '';
+  if(!ultimaBusqueda) return;
+  const {tipo, items, minT} = ultimaBusqueda;
+  const cats = [...new Set(items.flatMap(it => catsDeItem(it, tipo)))];
+  if(!catsActivas) catsActivas = new Set(cats);
+  if(cats.length > 1){
+    for(const c of cats){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fchip' + (catsActivas.has(c) ? '' : ' off');
+      b.textContent = CAT_LABEL[c] || c;
+      b.addEventListener('click', () => {
+        if(catsActivas.has(c)){ if(catsActivas.size > 1) catsActivas.delete(c); }
+        else catsActivas.add(c);
+        renderResultados();
+      });
+      filtEl.appendChild(b);
+    }
+  }
+  const visibles = items.filter(it => catsDeItem(it, tipo).every(x => catsActivas.has(x)));
+  const ocultos = items.length - visibles.length;
+  const sufijo = ocultos > 0 ? ` (${ocultos} más oculto(s) por el filtro)` : '';
+  if(tipo === 'directos'){
+    estadoEl.textContent = `${visibles.length} tren(es) directo(s) encontrado(s).` + sufijo;
+    for(const r of visibles) pintarDirecto(resEl, r);
+  } else if(tipo === 'con1'){
+    estadoEl.textContent = `Sin trenes directos. ${visibles.length} opción(es) con 1 transbordo ` +
+      `(enlace mínimo ${minT} min):` + sufijo;
+    for(const c of visibles) pintarConexion(resEl, c);
+  } else {
+    estadoEl.textContent = `Sin trenes directos ni enlaces con 1 transbordo. ` +
+      `${visibles.length} opción(es) con 2 transbordos (enlace mínimo ${minT} min):` + sufijo;
+    for(const c of visibles) pintarConexion(resEl, c);
+  }
+}
+
 function buscar(){
   const oIdx = resolverEstacion('origen');
   const dIdx = resolverEstacion('destino');
   const estadoEl = document.getElementById('estado');
-  const resEl = document.getElementById('resultados');
-  resEl.innerHTML = '';
+  limpiarResultados();
 
   if(oIdx < 0 || dIdx < 0){
     estadoEl.textContent = 'Selecciona un origen y un destino válidos de la lista de sugerencias.';
@@ -1255,6 +1481,8 @@ function buscar(){
   const hora = document.getElementById('hora').value;   // HH:MM
   const todoElDia = document.getElementById('todo-el-dia').checked;
   if(!fecha){ estadoEl.textContent = 'Indica una fecha.'; return; }
+
+  guardarReciente(DB.estaciones[oIdx][0], DB.estaciones[dIdx][0]);
 
   const dateInt = parseInt(fecha.replace(/-/g,''), 10);
   const jsDate = new Date(fecha + 'T00:00:00');
@@ -1273,8 +1501,8 @@ function buscar(){
 
   const directos = buscarDirectos(activos, oIdx, dIdx, minSel);
   if(directos.length){
-    estadoEl.textContent = `${directos.length} tren(es) directo(s) encontrado(s).`;
-    for(const r of directos) pintarDirecto(resEl, r);
+    ultimaBusqueda = {tipo: 'directos', items: directos, minT, fechaISO: fecha};
+    renderResultados();
     return;
   }
 
@@ -1282,18 +1510,16 @@ function buscar(){
   const llegadas1 = llegadasIniciales(activos, oIdx, dIdx, minSel);
   const enlaces1 = cerrarEnDestino(llegadas1, activos, oIdx, dIdx, minT);
   if(enlaces1.length){
-    estadoEl.textContent = `Sin trenes directos. ${enlaces1.length} opción(es) con 1 transbordo ` +
-      `(enlace mínimo ${minT} min):`;
-    for(const c of enlaces1) pintarConexion(resEl, c);
+    ultimaBusqueda = {tipo: 'con1', items: enlaces1, minT, fechaISO: fecha};
+    renderResultados();
     return;
   }
 
   const llegadas2 = expandirTransbordo(llegadas1, activos, oIdx, dIdx, minT);
   const enlaces2 = cerrarEnDestino(llegadas2, activos, oIdx, dIdx, minT);
   if(enlaces2.length){
-    estadoEl.textContent = `Sin trenes directos ni enlaces con 1 transbordo. ` +
-      `${enlaces2.length} opción(es) con 2 transbordos (enlace mínimo ${minT} min):`;
-    for(const c of enlaces2) pintarConexion(resEl, c);
+    ultimaBusqueda = {tipo: 'con2', items: enlaces2, minT, fechaISO: fecha};
+    renderResultados();
     return;
   }
 
@@ -1302,8 +1528,74 @@ function buscar(){
     (todoElDia ? '.' : ' a partir de esa hora.');
 }
 
+// ---------- Salidas desde una estación ----------
+function buscarSalidas(){
+  const estadoEl = document.getElementById('estado');
+  const resEl = document.getElementById('resultados');
+  limpiarResultados();
+
+  const stIdx = resolverEstacion('sal-estacion');
+  if(stIdx < 0){
+    estadoEl.textContent = 'Selecciona una estación válida de la lista de sugerencias.';
+    return;
+  }
+  const fecha = document.getElementById('sal-fecha').value;
+  if(!fecha){ estadoEl.textContent = 'Indica una fecha.'; return; }
+  const hora = document.getElementById('sal-hora').value;
+  const dateInt = parseInt(fecha.replace(/-/g,''), 10);
+  const weekdayBit = (new Date(fecha + 'T00:00:00').getDay() + 6) % 7;
+  const [hh, mm] = (hora || '00:00').split(':').map(Number);
+  const minSel = hh*60 + mm;
+
+  const salidas = [];
+  for(const trip of DB.trips){
+    if(dateInt < trip[4] || dateInt > trip[5]) continue;
+    if((trip[3] & (1<<weekdayBit)) === 0) continue;
+    const stops = trip[6], n = stops.length/3;
+    for(let p=0;p<n-1;p++){  // la última parada no es una salida
+      if(stops[p*3] !== stIdx) continue;
+      const dep = stops[p*3+2];
+      if(dep >= minSel) salidas.push({dep, trip, pos: p});
+      break;
+    }
+  }
+  salidas.sort((a,b) => a.dep - b.dep);
+
+  const MAX = 40;
+  const nombre = DB.estaciones[stIdx][0];
+  if(!salidas.length){
+    estadoEl.textContent = `Sin salidas desde ${nombre} ese día a partir de esa hora.`;
+    return;
+  }
+  estadoEl.textContent = `${salidas.length} salida(s) desde ${nombre}` +
+    (salidas.length > MAX ? ` (se muestran las ${MAX} primeras):` : ':');
+  const card = document.createElement('div');
+  card.className = 'resultado';
+  card.innerHTML = salidas.slice(0, MAX).map(s => {
+    const stops = s.trip[6], n = stops.length/3;
+    const destino = DB.estaciones[stops[(n-1)*3]][0];
+    const sigs = [];
+    for(let p=s.pos+1;p<n;p++){
+      sigs.push(`<div class="parada"><span>${DB.estaciones[stops[p*3]][0]}</span><span>${fmtHora(stops[p*3+1])}</span></div>`);
+    }
+    return `<details class="salida">
+      <summary><span class="hh">${fmtHora(s.dep)}</span>
+        <span class="badge ${s.trip[0]}">${s.trip[0]}</span>
+        <span class="dest">${destino}</span>
+        <span class="linea">${DB.lineas[s.trip[1]]}</span></summary>
+      <div class="cuerpo">
+        <div class="meta">${trenLabel(s.trip[2])} · llegada a ${destino} a las ${fmtHora(stops[(n-1)*3+1])}</div>
+        ${sigs.join('')}
+        ${incidenciasHTML(s.trip, s.pos, n-1)}
+      </div>
+    </details>`;
+  }).join('');
+  resEl.appendChild(card);
+}
+
 document.getElementById('btn-buscar').addEventListener('click', buscar);
 document.getElementById('btn-buscar-numero').addEventListener('click', buscarPorNumero);
+document.getElementById('btn-salidas').addEventListener('click', buscarSalidas);
 document.getElementById('inc-ambito').addEventListener('change', renderIncidencias);
 document.getElementById('inc-linea').addEventListener('change', renderIncidencias);
 document.getElementById('num-tren').addEventListener('keydown', (e) => {
@@ -1317,7 +1609,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.querySelectorAll('.tabpanel').forEach(p =>
       p.classList.toggle('active', p.id === 'panel-' + tab.dataset.tab));
     document.getElementById('estado').textContent = '';
-    document.getElementById('resultados').innerHTML = '';
+    limpiarResultados();
     if(tab.dataset.tab === 'incidencias') renderIncidencias();
   });
 });
@@ -1333,11 +1625,28 @@ function ahoraLocal(){
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
 
+function avisoDatos(){
+  const fechaTxt = `${DATA_FECHA.slice(8,10)}/${DATA_FECHA.slice(5,7)}/${DATA_FECHA.slice(0,4)}`;
+  document.getElementById('fecha-datos').textContent =
+    ` Horarios extraídos de los operadores el ${fechaTxt}.`;
+  const dias = Math.floor((Date.now() - new Date(DATA_FECHA + 'T00:00:00').getTime())/86400000);
+  if(dias > 60){
+    const el = document.getElementById('aviso-datos');
+    el.textContent = `⚠️ Los horarios de esta app se extrajeron hace ${Math.round(dias/30)} meses ` +
+      `(${fechaTxt}) y pueden haber cambiado. Si hay una versión más reciente de la app, actualízala.`;
+    el.style.display = 'block';
+  }
+}
+
 (async function init(){
   document.getElementById('fecha').value = hoyLocal();
   document.getElementById('hora').value = ahoraLocal();
+  document.getElementById('sal-fecha').value = hoyLocal();
+  document.getElementById('sal-hora').value = ahoraLocal();
   setupAutocomplete('origen','sugg-origen');
   setupAutocomplete('destino','sugg-destino');
+  setupAutocomplete('sal-estacion','sugg-sal');
+  avisoDatos();
   try{
     await cargarDatos();
     const btn = document.getElementById('btn-buscar');
@@ -1346,6 +1655,10 @@ function ahoraLocal(){
     const btnNum = document.getElementById('btn-buscar-numero');
     btnNum.disabled = false;
     btnNum.textContent = 'Buscar tren';
+    const btnSal = document.getElementById('btn-salidas');
+    btnSal.disabled = false;
+    btnSal.textContent = 'Ver salidas';
+    renderChips();
     poblarAmbitos();
     cargarIncidencias(); // en segundo plano; si no hay red, la pestaña no aparece
   }catch(e){
@@ -1360,10 +1673,13 @@ function ahoraLocal(){
 
 
 def main():
-    b64 = pathlib.Path(B64_PATH).read_text().strip()
-    html = TEMPLATE.replace("__DATA_B64__", b64)
+    path = pathlib.Path(B64_PATH)
+    b64 = path.read_text().strip()
+    # Fecha de extracción de los horarios: la de generación del payload
+    fecha = datetime.date.fromtimestamp(path.stat().st_mtime).isoformat()
+    html = TEMPLATE.replace("__DATA_B64__", b64).replace("__DATA_FECHA__", fecha)
     pathlib.Path(OUT_HTML).write_text(html, encoding="utf-8")
-    print(f"Generado: {OUT_HTML} ({len(html)/1e6:.1f} MB)")
+    print(f"Generado: {OUT_HTML} ({len(html)/1e6:.1f} MB, horarios del {fecha})")
 
 
 if __name__ == "__main__":
