@@ -132,8 +132,10 @@ TEMPLATE = """<!DOCTYPE html>
     font-size:.78rem;color:var(--text);cursor:pointer;max-width:100%}
   .chip:active{background:#2f4356}
   .chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .chip .fav{color:var(--muted);font-size:.95rem;line-height:1}
-  .chip .fav.on{color:#f0b429}
+  .chip.favorita{background:linear-gradient(180deg,var(--accent),var(--accent2));
+    border-color:var(--accent2);color:#fff}
+  .chip.favorita:active{background:var(--accent2)}
+  .chip .del{color:rgba(255,255,255,.85);font-size:.95rem;line-height:1;font-weight:700;padding:0 1px}
   .filtros{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
   .filtros:empty{display:none}
   .fchip{border:1px solid var(--border);background:var(--panel2);color:var(--text);
@@ -201,6 +203,10 @@ TEMPLATE = """<!DOCTYPE html>
       <div class="chk">
         <input type="checkbox" id="todo-el-dia">
         <label for="todo-el-dia" style="margin:0">Ver todo el día (ignorar la hora)</label>
+      </div>
+      <div class="chk">
+        <input type="checkbox" id="guardar-fav">
+        <label for="guardar-fav" style="margin:0">Guardar trayecto como favorito</label>
       </div>
 
       <button class="buscar" id="btn-buscar" disabled>Cargando datos…</button>
@@ -367,34 +373,27 @@ function resolverEstacion(inputId){
   return i>=0 ? i : -1;
 }
 
-// ---------- Favoritos y búsquedas recientes ----------
+// ---------- Trayectos favoritos ----------
 // Se guardan por NOMBRE de estación (no por índice): los índices cambian
 // cuando se actualiza el payload de datos.
-const LS_FAV = 'bt_favoritos', LS_REC = 'bt_recientes';
+const LS_FAV = 'bt_favoritos';
 function lsGet(k){ try{ return JSON.parse(localStorage.getItem(k)) || []; }catch(e){ return []; } }
 function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 const mismoPar = (a, b) => a[0] === b[0] && a[1] === b[1];
 
-function guardarReciente(o, d){
+function guardarTrayecto(o, d){
+  const chk = document.getElementById('guardar-fav');
+  if(!chk.checked) return;
   const par = [o, d];
-  if(!lsGet(LS_FAV).some(p => mismoPar(p, par))){
-    const rec = lsGet(LS_REC).filter(p => !mismoPar(p, par));
-    rec.unshift(par);
-    lsSet(LS_REC, rec.slice(0, 5));
-  }
+  const fav = lsGet(LS_FAV).filter(p => !mismoPar(p, par));
+  fav.unshift(par);
+  lsSet(LS_FAV, fav.slice(0, 8));
+  chk.checked = false;
   renderChips();
 }
 
-function toggleFavorito(par){
-  let fav = lsGet(LS_FAV);
-  if(fav.some(p => mismoPar(p, par))){
-    fav = fav.filter(p => !mismoPar(p, par));
-  } else {
-    fav.unshift(par);
-    fav = fav.slice(0, 8);
-    lsSet(LS_REC, lsGet(LS_REC).filter(p => !mismoPar(p, par)));
-  }
-  lsSet(LS_FAV, fav);
+function borrarFavorito(par){
+  lsSet(LS_FAV, lsGet(LS_FAV).filter(p => !mismoPar(p, par)));
   renderChips();
 }
 
@@ -408,22 +407,21 @@ function setEstacion(inputId, nombre){
 function renderChips(){
   const cont = document.getElementById('chips-trayectos');
   cont.innerHTML = '';
-  const pares = lsGet(LS_FAV).map(p => [p, true]).concat(lsGet(LS_REC).map(p => [p, false]));
-  for(const [par, esFav] of pares){
+  for(const par of lsGet(LS_FAV)){
     // solo trayectos cuyas estaciones sigan existiendo tras actualizar datos
     if(estNombres.indexOf(normaliza(par[0])) < 0 || estNombres.indexOf(normaliza(par[1])) < 0) continue;
     const chip = document.createElement('span');
-    chip.className = 'chip';
+    chip.className = 'chip favorita';
     const t = document.createElement('span');
     t.className = 't';
     t.textContent = par[0] + ' → ' + par[1];
-    const star = document.createElement('span');
-    star.className = 'fav' + (esFav ? ' on' : '');
-    star.textContent = esFav ? '★' : '☆';
-    star.title = esFav ? 'Quitar de favoritos' : 'Guardar como favorito';
-    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFavorito(par); });
     chip.appendChild(t);
-    chip.appendChild(star);
+    const del = document.createElement('span');
+    del.className = 'del';
+    del.textContent = '✕';
+    del.title = 'Borrar favorito';
+    del.addEventListener('click', (e) => { e.stopPropagation(); borrarFavorito(par); });
+    chip.appendChild(del);
     chip.addEventListener('click', () => {
       setEstacion('origen', par[0]);
       setEstacion('destino', par[1]);
@@ -1482,7 +1480,7 @@ function buscar(){
   const todoElDia = document.getElementById('todo-el-dia').checked;
   if(!fecha){ estadoEl.textContent = 'Indica una fecha.'; return; }
 
-  guardarReciente(DB.estaciones[oIdx][0], DB.estaciones[dIdx][0]);
+  guardarTrayecto(DB.estaciones[oIdx][0], DB.estaciones[dIdx][0]);
 
   const dateInt = parseInt(fecha.replace(/-/g,''), 10);
   const jsDate = new Date(fecha + 'T00:00:00');
@@ -1639,6 +1637,7 @@ function avisoDatos(){
 }
 
 (async function init(){
+  try{ localStorage.removeItem('bt_recientes'); }catch(e){} // restos de versiones anteriores
   document.getElementById('fecha').value = hoyLocal();
   document.getElementById('hora').value = ahoraLocal();
   document.getElementById('sal-fecha').value = hoyLocal();
