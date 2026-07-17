@@ -153,6 +153,18 @@ TEMPLATE = """<!DOCTYPE html>
   #aviso-datos{display:none;margin:0 0 14px;padding:9px 12px;line-height:1.45;
     border-left:3px solid #f0b429;background:rgba(240,180,41,.08);
     border-radius:8px;font-size:.8rem;color:var(--muted)}
+  #seguimiento:empty{display:none}
+  .segcard{background:linear-gradient(180deg,#152a42 0%,#121b26 100%);
+    border:1px solid var(--accent2);border-radius:16px;padding:14px 15px;
+    margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .segcab{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .segcab .ruta{font-weight:700;font-size:.88rem;flex:1;min-width:0}
+  .segbar{height:6px;border-radius:999px;background:var(--panel2);margin:11px 0 9px;overflow:hidden}
+  .segbar div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:999px}
+  .segbig{font-size:1.02rem;font-weight:700;margin:6px 0 2px}
+  .seggps{font-size:.78rem;margin-top:6px;color:#7fc98f}
+  .seggps.tarde{color:#f0b429}
+  .croquis{display:block;width:100%;height:auto;margin-top:10px}
   @media (min-width:600px){ .wrap{padding-top:26px} }
 </style>
 </head>
@@ -161,6 +173,7 @@ TEMPLATE = """<!DOCTYPE html>
   <h1>🚆 BuscaTrenes</h1>
 
   <div id="aviso-datos"></div>
+  <div id="seguimiento"></div>
 
   <div class="tabs">
     <button type="button" class="tab active" id="tab-estacion" data-tab="estacion">Trayecto</button>
@@ -1209,6 +1222,445 @@ function aCalendario(titulo, desc, depMin, arrMin){
   toast('Evento de calendario descargado (.ics)');
 }
 
+// ---------- Seguimiento de un trayecto ----------
+// SEG = {dataFecha, fechaISO, legs:[{cat, numero, linea, paradas:[[estIdx,arr,dep],...]}]}
+// Persistido en localStorage; los índices de estación son válidos mientras no
+// cambie el payload de datos (se comprueba dataFecha al restaurar).
+const LS_SEG = 'bt_seguimiento';
+let SEG = null;
+let segTimer = null;
+let segDelay = null;     // retraso estimado por GPS (min, suavizado)
+let segLegActivo = null; // leg en curso (para el GPS), null si no estamos en marcha
+let segWake = null;      // wake lock de pantalla durante el viaje
+
+function segDesdeTrip(trip, ini, fin){
+  const stops = trip[6], paradas = [];
+  for(let p=ini;p<=fin;p++) paradas.push([stops[p*3], stops[p*3+1], stops[p*3+2]]);
+  return {cat: trip[0], numero: trip[2], linea: DB.lineas[trip[1]], paradas};
+}
+
+function iniciarSeguimiento(legs, fechaISO){
+  if(!fechaISO) return;
+  SEG = {dataFecha: DATA_FECHA, fechaISO, legs};
+  segDelay = null;
+  segRT = null;
+  segRTts = 0;
+  segPosUsuario = null;
+  lsSet(LS_SEG, SEG);
+  if(segTimer) clearInterval(segTimer);
+  segTimer = setInterval(tickSeguimiento, 30000);
+  tickSeguimiento();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  toast('Siguiendo el trayecto');
+}
+
+function pararSeguimiento(){
+  SEG = null;
+  segDelay = null;
+  segRT = null;
+  segRTts = 0;
+  segPosUsuario = null;
+  segLegActivo = null;
+  if(segTimer){ clearInterval(segTimer); segTimer = null; }
+  try{ localStorage.removeItem(LS_SEG); }catch(e){}
+  document.getElementById('seguimiento').innerHTML = '';
+  segWakeLock(false);
+}
+
+async function segWakeLock(on){
+  try{
+    if(on && !segWake && 'wakeLock' in navigator){
+      segWake = await navigator.wakeLock.request('screen');
+      segWake.addEventListener('release', () => { segWake = null; });
+    } else if(!on && segWake){
+      const w = segWake; segWake = null;
+      await w.release();
+    }
+  }catch(e){ segWake = null; }
+}
+
+function fmtRestante(min){
+  min = Math.max(0, Math.round(min));
+  const d = Math.floor(min/1440), h = Math.floor((min%1440)/60), m = min%60;
+  if(d) return `${d} d ${h} h`;
+  if(h) return `${h} h ${m} min`;
+  return `${m} min`;
+}
+
+// Estima el retraso comparando la posición GPS con el punto donde el tren
+// debería estar según horario: proyecta la posición sobre el tramo más
+// cercano entre estaciones consecutivas y convierte esa fracción en la hora
+// teórica de paso; retraso = ahora - esa hora. Solo si estás a <5 km de la ruta.
+function retrasoDesdePos(leg, lat, lon, nowMin){
+  const P = leg.paradas;
+  let best = null;
+  const kx = 111.32*Math.cos(lat*Math.PI/180), ky = 110.57; // km por grado
+  for(let i=0;i<P.length-1;i++){
+    const a = DB.estaciones[P[i][0]], b = DB.estaciones[P[i+1][0]];
+    if(a[1]==null || b[1]==null) continue;
+    const ax=(a[2]-lon)*kx, ay=(a[1]-lat)*ky, bx=(b[2]-lon)*kx, by=(b[1]-lat)*ky;
+    const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
+    let t = L2 > 0 ? (-(ax*dx+ay*dy))/L2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const px=ax+dx*t, py=ay+dy*t;
+    const dist = Math.sqrt(px*px+py*py);
+    if(!best || dist < best.dist){
+      const dep = P[i][2] >= 0 ? P[i][2] : P[i][1];
+      const arr = P[i+1][1] >= 0 ? P[i+1][1] : P[i+1][2];
+      best = {dist, tSched: dep + (arr-dep)*t};
+    }
+  }
+  if(!best || best.dist > 5) return null;
+  return nowMin - best.tSched;
+}
+
+// ---------- Datos oficiales GTFS-RT del tren seguido (solo Cercanías) ----------
+// Renfe publica en abierto los retrasos por tren (trip_updates) y la posición
+// de cada tren en circulación (vehicle_positions). El número de tren va dentro
+// del tripId (p. ej. 3095V23541C1) y casa con el campo `numero` del payload;
+// el stopId casa con DB.codigos. AV/LD/MD no están en el feed: para esos
+// trenes se usa solo la estimación GPS.
+const URL_RT_TRIP = 'https://gtfsrt.renfe.com/trip_updates.json';
+const URL_RT_VEH = 'https://gtfsrt.renfe.com/vehicle_positions.json';
+let segRT = null;  // {delayMin, estIdx, status} del tren seguido, null si no hay dato
+let segRTts = 0;   // instante de la última consulta (throttle de ~60 s)
+
+function numeroDeTripId(tid){
+  const m = /V0*(\d+)/.exec(tid || '');
+  return m ? m[1] : null;
+}
+
+function segLegParaRT(){
+  // Tramo relevante para el feed: el que está en curso o sale en <45 min,
+  // y solo si es de Cercanías
+  if(!SEG) return null;
+  const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
+  const nowMin = (Date.now() - base)/60000;
+  for(const leg of SEG.legs){
+    const P = leg.paradas;
+    if(nowMin > P[P.length-1][1] + 5) continue; // tramo ya terminado
+    if(P[0][2] - nowMin > 45) break;            // aún falta mucho
+    return leg.cat === 'CER' ? leg : null;
+  }
+  return null;
+}
+
+async function actualizarRTSeguimiento(leg){
+  const num = normalizaNumeroTren(leg.numero || '');
+  if(!num) return;
+  segRTts = Date.now();
+  const [tu, vp] = await Promise.all([fetchBytes(URL_RT_TRIP), fetchBytes(URL_RT_VEH)]);
+  if(!tu && !vp) return; // sin red: se conserva el último dato
+  const rt = {delayMin: null, estIdx: -1, status: ''};
+  let visto = false;
+  try{
+    if(tu){
+      const d = JSON.parse(utf8.decode(tu));
+      for(const e of (d.entity || [])){
+        const t = e.tripUpdate;
+        if(!t || numeroDeTripId(t.trip && t.trip.tripId) !== num) continue;
+        let del = t.delay != null ? t.delay : null;
+        const stu = t.stopTimeUpdate || [];
+        for(let i=stu.length-1;i>=0;i--){
+          const a = stu[i].arrival || stu[i].departure;
+          if(a && a.delay != null){ del = a.delay; break; }
+        }
+        if(del != null){ rt.delayMin = Math.round(del/60); visto = true; }
+        break;
+      }
+    }
+  }catch(e){}
+  try{
+    if(vp){
+      const d = JSON.parse(utf8.decode(vp));
+      for(const e of (d.entity || [])){
+        const v = e.vehicle;
+        if(!v) continue;
+        const porTrip = numeroDeTripId(v.trip && v.trip.tripId) === num;
+        const porVeh = normalizaNumeroTren((v.vehicle && v.vehicle.id) || '') === num;
+        if(!porTrip && !porVeh) continue;
+        if(v.stopId && v.stopId in DB.codigos){ rt.estIdx = DB.codigos[v.stopId]; }
+        if(v.position && v.position.latitude != null){
+          rt.lat = v.position.latitude;
+          rt.lon = v.position.longitude;
+        }
+        rt.status = v.currentStatus || '';
+        visto = true;
+        break;
+      }
+    }
+  }catch(e){}
+  if(!SEG) return;
+  segRT = visto ? rt : null; // el tren dejó de aparecer en el feed: descartar
+  renderSeguimiento();
+}
+
+// ---------- Croquis de la ruta ----------
+let segPosUsuario = null; // última posición GPS del usuario durante el seguimiento
+
+// Posición estimada del tren: la oficial del feed si existe; si no, interpolando
+// el horario (corregido con el retraso conocido) entre estaciones consecutivas.
+function posTrenEstimada(){
+  if(!SEG) return null;
+  if(segRT && segRT.lat != null) return {lat: segRT.lat, lon: segRT.lon};
+  const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
+  const nowMin = (Date.now() - base)/60000;
+  const oficial = segRT && segRT.delayMin != null ? segRT.delayMin : null;
+  const retraso = oficial != null ? oficial : (segDelay != null ? Math.round(segDelay) : 0);
+  const tEff = nowMin - Math.max(0, retraso);
+  const coord = i => { const e = DB.estaciones[i]; return e[1] != null ? {lat: e[1], lon: e[2]} : null; };
+  if(tEff <= SEG.legs[0].paradas[0][2]) return coord(SEG.legs[0].paradas[0][0]);
+  for(const leg of SEG.legs){
+    const P = leg.paradas;
+    if(tEff > P[P.length-1][1]) continue;
+    if(tEff < P[0][2]) return coord(P[0][0]); // esperando en el andén (transbordo)
+    for(let i=0;i<P.length-1;i++){
+      const dep = P[i][2], arr = P[i+1][1];
+      if(tEff > arr) continue;
+      if(tEff <= dep) return coord(P[i][0]); // parado en la estación
+      const a = coord(P[i][0]), b = coord(P[i+1][0]);
+      if(!a || !b) return null;
+      const f = (tEff - dep)/Math.max(0.01, arr - dep);
+      return {lat: a.lat + (b.lat - a.lat)*f, lon: a.lon + (b.lon - a.lon)*f};
+    }
+    return coord(P[P.length-1][0]);
+  }
+  const U = SEG.legs[SEG.legs.length-1].paradas;
+  return coord(U[U.length-1][0]);
+}
+
+function croquisSVG(){
+  if(!SEG || !DB) return '';
+  const legsPts = [];
+  for(const leg of SEG.legs){
+    const pts = [];
+    for(const p of leg.paradas){
+      const e = DB.estaciones[p[0]];
+      if(e[1] != null) pts.push({lat: e[1], lon: e[2], nombre: e[0]});
+    }
+    if(pts.length >= 2) legsPts.push(pts);
+  }
+  if(!legsPts.length) return '';
+  const tren = posTrenEstimada();
+  const todos = legsPts.flat().slice();
+  if(tren) todos.push(tren);
+  if(segPosUsuario) todos.push(segPosUsuario);
+  let minLat=Infinity, maxLat=-Infinity, minLon=Infinity, maxLon=-Infinity;
+  for(const p of todos){
+    minLat=Math.min(minLat,p.lat); maxLat=Math.max(maxLat,p.lat);
+    minLon=Math.min(minLon,p.lon); maxLon=Math.max(maxLon,p.lon);
+  }
+  const kx = Math.cos(((minLat+maxLat)/2)*Math.PI/180);
+  const W=320, H=170, M=20;
+  const spanX = Math.max(1e-4,(maxLon-minLon)*kx), spanY = Math.max(1e-4, maxLat-minLat);
+  const s = Math.min((W-2*M)/spanX, (H-2*M)/spanY);
+  const ox = (W - spanX*s)/2, oy = (H - spanY*s)/2;
+  const X = p => ox + (p.lon-minLon)*kx*s;
+  const Y = p => oy + (maxLat-p.lat)*s;
+  const xy = p => `${X(p).toFixed(1)},${Y(p).toFixed(1)}`;
+
+  let lineas = '';
+  legsPts.forEach((pts, i) => {
+    lineas += `<polyline points="${pts.map(xy).join(' ')}" fill="none" stroke="#3a5372" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    if(i > 0){
+      const a = legsPts[i-1][legsPts[i-1].length-1], b = pts[0];
+      lineas += `<line x1="${X(a).toFixed(1)}" y1="${Y(a).toFixed(1)}" x2="${X(b).toFixed(1)}" y2="${Y(b).toFixed(1)}" stroke="#8fa1b3" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+    }
+  });
+
+  // tramo ya recorrido: proyectar el tren sobre la cadena de estaciones
+  const cadena = legsPts.flat();
+  let best = null;
+  if(tren){
+    const tx0 = X(tren), ty0 = Y(tren);
+    for(let i=0;i<cadena.length-1;i++){
+      const ax=X(cadena[i]), ay=Y(cadena[i]), bx=X(cadena[i+1]), by=Y(cadena[i+1]);
+      const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
+      let t = L2>0 ? ((tx0-ax)*dx+(ty0-ay)*dy)/L2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const px=ax+dx*t, py=ay+dy*t;
+      const d2 = (px-tx0)*(px-tx0)+(py-ty0)*(py-ty0);
+      if(!best || d2 < best.d2) best = {d2, i, px, py};
+    }
+    if(best){
+      const rec = cadena.slice(0, best.i+1).map(xy);
+      rec.push(`${best.px.toFixed(1)},${best.py.toFixed(1)}`);
+      lineas += `<polyline points="${rec.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+  }
+
+  // estaciones: puntos pequeños; extremos y transbordos con etiqueta
+  let marcas = '', etiquetas = '';
+  const etiquetadas = new Set();
+  legsPts.forEach((pts, i) => {
+    pts.forEach((p, j) => {
+      const esClave = j === 0 || j === pts.length-1;
+      if(!esClave){
+        marcas += `<circle cx="${X(p).toFixed(1)}" cy="${Y(p).toFixed(1)}" r="1.8" fill="#64809c"/>`;
+        return;
+      }
+      marcas += `<circle cx="${X(p).toFixed(1)}" cy="${Y(p).toFixed(1)}" r="3.4" fill="#fff" stroke="var(--accent2)" stroke-width="1.5"/>`;
+      if(etiquetadas.has(p.nombre)) return;
+      etiquetadas.add(p.nombre);
+      const nx = X(p), fin = nx > W - 130;
+      etiquetas += `<text x="${(fin ? nx-6 : nx+6).toFixed(1)}" y="${(Y(p)+3).toFixed(1)}" font-size="9" fill="#8fa1b3"${fin ? ' text-anchor="end"' : ''}>${esc(p.nombre)}</text>`;
+    });
+  });
+
+  let trenSvg = '';
+  if(tren){
+    const tx = best ? best.px.toFixed(1) : X(tren).toFixed(1);
+    const ty = best ? best.py.toFixed(1) : Y(tren).toFixed(1);
+    trenSvg = `<circle cx="${tx}" cy="${ty}" r="6" fill="none" stroke="var(--accent)" stroke-width="2" opacity=".8">
+        <animate attributeName="r" values="6;13" dur="1.6s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".8;0" dur="1.6s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${tx}" cy="${ty}" r="4.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>`;
+  }
+  let usuarioSvg = '';
+  if(segPosUsuario){
+    usuarioSvg = `<circle cx="${X(segPosUsuario).toFixed(1)}" cy="${Y(segPosUsuario).toFixed(1)}" r="3.2" fill="#34d399" stroke="#0b1219" stroke-width="1.2"/>`;
+  }
+
+  return `<svg class="croquis" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0" y="0" width="${W}" height="${H}" rx="12" fill="rgba(30,43,58,.5)"/>
+    ${lineas}${marcas}${usuarioSvg}${trenSvg}${etiquetas}
+  </svg>`;
+}
+
+function renderSeguimiento(){
+  const cont = document.getElementById('seguimiento');
+  if(!SEG || !DB){ if(cont) cont.innerHTML=''; return; }
+  const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
+  const nowMin = (Date.now() - base)/60000;
+  const legs = SEG.legs;
+  const ultimaP = legs[legs.length-1].paradas;
+  const salidaTotal = legs[0].paradas[0][2];
+  const llegadaTotal = ultimaP[ultimaP.length-1][1];
+  const oNombre = DB.estaciones[legs[0].paradas[0][0]][0];
+  const dNombre = DB.estaciones[ultimaP[ultimaP.length-1][0]][0];
+
+  if(nowMin > llegadaTotal + 120){ pararSeguimiento(); return; }
+
+  segLegActivo = null;
+  let cuerpo = '', gps = '', barra = '', enViaje = false;
+  const oficial = segRT && segRT.delayMin != null ? segRT.delayMin : null;
+  let posRT = '';
+  if(segRT && segRT.estIdx >= 0){
+    const nom = DB.estaciones[segRT.estIdx][0];
+    const verbo = segRT.status === 'STOPPED_AT' ? 'parado en'
+      : (segRT.status === 'INCOMING_AT' ? 'llegando a' : 'en camino a');
+    posRT = `<div class="seggps">📍 Tu tren: ${verbo} ${nom}</div>`;
+  }
+
+  if(nowMin < salidaTotal){
+    const fTxt = `${SEG.fechaISO.slice(8,10)}/${SEG.fechaISO.slice(5,7)}`;
+    // con retraso conocido, lo que importa es la hora estimada a la que el
+    // tren pasará de verdad por la estación de origen (donde nos montamos)
+    const ret = oficial != null && oficial > 0 ? oficial : 0;
+    const salidaPrev = salidaTotal + ret;
+    cuerpo = `<div class="segbig">Sale a las ${fmtHora(salidaTotal)}${ret ? ` · prevista ~${fmtHora(salidaPrev)}` : ''} · faltan ${fmtRestante(salidaPrev - nowMin)}</div>
+      <div class="meta">El ${fTxt} desde ${oNombre} · llegada a ${dNombre} a las ${fmtHora(llegadaTotal)}${ret ? ` (~${fmtHora(llegadaTotal + ret)} con el retraso)` : ''}</div>`;
+  } else if(nowMin >= llegadaTotal){
+    cuerpo = `<div class="segbig">Llegada teórica: ${fmtHora(llegadaTotal)}</div>
+      <div class="meta">Trayecto finalizado según horario. Esta tarjeta se cerrará sola.</div>`;
+  } else {
+    enViaje = true;
+    const frac = Math.max(0, Math.min(1, (nowMin - salidaTotal)/(llegadaTotal - salidaTotal)));
+    barra = `<div class="segbar"><div style="width:${(frac*100).toFixed(1)}%"></div></div>`;
+    // primer leg aún no terminado
+    let idx = 0;
+    while(idx < legs.length - 1 && nowMin > legs[idx].paradas[legs[idx].paradas.length-1][1]) idx++;
+    const leg = legs[idx], P = leg.paradas;
+    const depLeg = P[0][2];
+    if(nowMin < depLeg){
+      // en el andén: espera o transbordo; con retraso conocido, contar hasta
+      // la hora estimada real de salida
+      const est = DB.estaciones[P[0][0]][0];
+      const ret = oficial != null && oficial > 0 ? oficial : 0;
+      const depPrev = depLeg + ret;
+      cuerpo = `<div class="segbig">${idx === 0 ? 'En ' + est : 'Transbordo en ' + est}</div>
+        <div class="meta">${leg.cat} ${trenLabel(leg.numero)} sale a las ${fmtHora(depLeg)}${ret ? ` · prevista ~${fmtHora(depPrev)}` : ''} · faltan ${fmtRestante(depPrev - nowMin)}</div>`;
+    } else {
+      segLegActivo = leg;
+      const retraso = oficial != null ? oficial : (segDelay != null ? Math.round(segDelay) : null);
+      const tEff = nowMin - (retraso != null && retraso > 0 ? retraso : 0);
+      const prox = [];
+      for(let i=1;i<P.length && prox.length<3;i++){
+        const arr = P[i][1] >= 0 ? P[i][1] : P[i][2];
+        if(arr >= tEff){
+          const nom = DB.estaciones[P[i][0]][0];
+          const est = retraso != null && retraso > 0 ? ` · prevista ~${fmtHora(arr + retraso)}` : '';
+          prox.push(`<div class="parada"><span>${nom}</span><span>${fmtHora(arr)}${est}</span></div>`);
+        }
+      }
+      const llegEst = retraso != null && retraso > 0 ? ` · prevista ~${fmtHora(llegadaTotal + retraso)}` : '';
+      cuerpo = `<div class="segbig">${leg.cat} ${trenLabel(leg.numero)} en marcha</div>
+        <div class="meta">Llegada a ${dNombre}: ${fmtHora(llegadaTotal)}${llegEst}</div>
+        ${prox.length ? `<div class="meta" style="margin-top:8px">Próximas paradas:</div>` + prox.join('') : ''}`;
+      if(oficial != null){
+        gps = Math.abs(oficial) < 2
+          ? `<div class="seggps">📡 En hora (dato oficial de Renfe)</div>`
+          : (oficial > 0
+            ? `<div class="seggps tarde">📡 ~${oficial} min de retraso (dato oficial de Renfe)</div>`
+            : `<div class="seggps">📡 ~${-oficial} min adelantado (dato oficial de Renfe)</div>`);
+      } else if(retraso != null){
+        gps = Math.abs(retraso) < 2
+          ? `<div class="seggps">🛰 En hora según tu posición GPS</div>`
+          : (retraso > 0
+            ? `<div class="seggps tarde">🛰 ~${retraso} min de retraso según tu posición GPS</div>`
+            : `<div class="seggps">🛰 ~${-retraso} min adelantado según tu posición GPS</div>`);
+      } else {
+        gps = `<div class="meta" style="margin-top:6px">🛰 Con permiso de ubicación se estima el retraso real.</div>`;
+      }
+    }
+  }
+
+  // fuera de la fase en marcha (cuenta atrás, andén, transbordo) el retraso
+  // oficial también es útil: el tren ya circula hacia ti
+  if(!segLegActivo && oficial != null && Math.abs(oficial) >= 2){
+    gps = oficial > 0
+      ? `<div class="seggps tarde">📡 El tren circula con ~${oficial} min de retraso (Renfe)</div>`
+      : `<div class="seggps">📡 El tren circula ~${-oficial} min adelantado (Renfe)</div>`;
+  }
+  const croquis = croquisSVG();
+  cont.innerHTML = `<div class="segcard">
+    <div class="segcab">
+      <span class="badge ${legs[0].cat}">${legs[0].cat}</span>
+      <span class="ruta">${oNombre} → ${dNombre}</span>
+      <button type="button" class="sharebtn stopseg">✕ Dejar de seguir</button>
+    </div>
+    ${barra}${cuerpo}${posRT}${gps}${croquis}
+  </div>`;
+  cont.querySelector('.stopseg').addEventListener('click', pararSeguimiento);
+  segWakeLock(enViaje);
+}
+
+function tickSeguimiento(){
+  if(!SEG) return;
+  renderSeguimiento();
+  // dato oficial GTFS-RT (Cercanías): consulta cada ~60 s
+  const legRT = segLegParaRT();
+  if(legRT && Date.now() - segRTts > 55000) actualizarRTSeguimiento(legRT);
+  if(segLegActivo && navigator.geolocation){
+    const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
+    const leg = segLegActivo;
+    navigator.geolocation.getCurrentPosition(p => {
+      if(!SEG || segLegActivo !== leg) return;
+      segPosUsuario = {lat: p.coords.latitude, lon: p.coords.longitude};
+      const r = retrasoDesdePos(leg, p.coords.latitude, p.coords.longitude, (Date.now() - base)/60000);
+      if(r != null){
+        segDelay = segDelay == null ? r : (segDelay + r)/2;
+        renderSeguimiento();
+      }
+    }, () => {}, {enableHighAccuracy: false, timeout: 8000, maximumAge: 20000});
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && SEG) tickSeguimiento();
+});
+
 function textoDirecto(r){
   const dur = r.arrD >= 0 ? durTxt(r.arrD - r.depO) : '';
   return `🚆 ${fechaSeleccionada()}\\n` +
@@ -1264,8 +1716,9 @@ function pintarDirecto(resEl, r){
       <span class="badge ${r.cat}">${r.cat}</span>
       <span class="tren">${trenLabel(r.numero)}</span>
       <span class="linea">${r.linea}</span>
-      <button type="button" class="sharebtn calbtn" style="margin-left:auto">🗓</button>
-      <button type="button" class="sharebtn" style="margin-left:0">📤 Compartir</button>
+      <button type="button" class="sharebtn segbtn" style="margin-left:auto">🎯 Seguir</button>
+      <button type="button" class="sharebtn calbtn" style="margin-left:0">🗓</button>
+      <button type="button" class="sharebtn compbtn" style="margin-left:0">📤 Compartir</button>
     </div>
     <div class="horas">
       <div><span class="hh">${fmtHora(r.depO)}</span><span class="st">${r.origenNombre}</span></div>
@@ -1282,9 +1735,12 @@ function pintarDirecto(resEl, r){
       </details>` : ''}
     ${incidenciasHTML(r.trip, r.posO, r.posD)}
   `;
+  div.querySelector('.segbtn').addEventListener('click', () =>
+    iniciarSeguimiento([segDesdeTrip(r.trip, r.posO, r.posD)],
+      (ultimaBusqueda && ultimaBusqueda.fechaISO) || document.getElementById('fecha').value));
   div.querySelector('.calbtn').addEventListener('click', () =>
     aCalendario(`Tren ${r.origenNombre} → ${r.destinoNombre}`, textoDirecto(r), r.depO, r.arrD));
-  div.querySelector('.sharebtn:not(.calbtn)').addEventListener('click', () => compartir(textoDirecto(r)));
+  div.querySelector('.compbtn').addEventListener('click', () => compartir(textoDirecto(r)));
   resEl.appendChild(div);
 }
 
@@ -1384,6 +1840,25 @@ function pintarConexion(resEl, c){
   const div = document.createElement('div');
   div.className = 'resultado';
   div.innerHTML = partes.join('');
+  const btnSeg = document.createElement('button');
+  btnSeg.type = 'button';
+  btnSeg.className = 'sharebtn';
+  btnSeg.style.marginLeft = '0';
+  btnSeg.textContent = '🎯 Seguir';
+  btnSeg.addEventListener('click', () => {
+    const legs = c.legs.map(l => {
+      const stops = l.trip[6];
+      let ini = -1, fin = -1;
+      for(let p=0;p<stops.length/3;p++){
+        const st = stops[p*3];
+        if(st === l.oSt && ini === -1) ini = p;
+        else if(st === l.dSt && ini !== -1){ fin = p; break; }
+      }
+      return segDesdeTrip(l.trip, ini, fin);
+    });
+    iniciarSeguimiento(legs, (ultimaBusqueda && ultimaBusqueda.fechaISO) || document.getElementById('fecha').value);
+  });
+  div.querySelector('.resfoot').appendChild(btnSeg);
   const btnCal = document.createElement('button');
   btnCal.type = 'button';
   btnCal.className = 'sharebtn';
@@ -1658,6 +2133,17 @@ function avisoDatos(){
     btnSal.disabled = false;
     btnSal.textContent = 'Ver salidas';
     renderChips();
+    // restaurar seguimiento en curso (solo si el payload de datos no ha cambiado)
+    try{
+      const s = JSON.parse(localStorage.getItem(LS_SEG));
+      if(s && s.dataFecha === DATA_FECHA && s.legs && s.legs.length){
+        SEG = s;
+        segTimer = setInterval(tickSeguimiento, 30000);
+        tickSeguimiento();
+      } else if(s){
+        localStorage.removeItem(LS_SEG);
+      }
+    }catch(e){}
     poblarAmbitos();
     cargarIncidencias(); // en segundo plano; si no hay red, la pestaña no aparece
   }catch(e){
