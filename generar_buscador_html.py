@@ -1243,6 +1243,11 @@ let segPregunta = false;  // mostrando "¿desea continuar el seguimiento?"
 let segPreguntado = false;// ya confirmado que sí: no volver a preguntar
 let segLejos = 0;         // posiciones GPS consecutivas lejos de la ruta
 let segProg = null;       // {t0, s0}: ancla para detectar que no se avanza por la ruta
+let segEmbarcado = false; // true tras detectar movimiento sostenido: se asume que se ha subido al tren
+let segTrackLeg = null;   // leg para el que se está acumulando la detección de embarque
+let segMovCount = 0;      // lecturas consecutivas de velocidad por encima del umbral de embarque
+let segUltimoFix = null;  // {t, lat, lon}: último fix GPS, para estimar velocidad si el navegador no la da
+const UMBRAL_EMBARQUE_KMH = 8; // por encima de un paso rápido: indica que vas en el tren
 
 function segDesdeTrip(trip, ini, fin){
   // paradas: el tramo que se viaja; todas: el recorrido completo del tren,
@@ -1267,6 +1272,10 @@ function iniciarSeguimiento(legs, fechaISO){
   segPreguntado = false;
   segLejos = 0;
   segProg = null;
+  segEmbarcado = false;
+  segTrackLeg = null;
+  segMovCount = 0;
+  segUltimoFix = null;
   if(segTimer) clearInterval(segTimer);
   segTimer = setInterval(tickSeguimiento, 30000);
   tickSeguimiento();
@@ -1284,6 +1293,10 @@ function pararSeguimiento(){
   segPreguntado = false;
   segLejos = 0;
   segProg = null;
+  segEmbarcado = false;
+  segTrackLeg = null;
+  segMovCount = 0;
+  segUltimoFix = null;
   segLegActivo = null;
   if(segTimer){ clearInterval(segTimer); segTimer = null; }
   document.getElementById('seguimiento').innerHTML = '';
@@ -1832,12 +1845,16 @@ function renderSeguimiento(){
           : (oficial > 0
             ? `<div class="seggps tarde">📡 ~${oficial} min de retraso (${fuente})</div>`
             : `<div class="seggps">📡 ~${-oficial} min adelantado (${fuente})</div>`);
-      } else if(retraso != null){
+      } else if(retraso != null && segEmbarcado){
         gps = Math.abs(retraso) < 2
           ? `<div class="seggps">🛰 En hora según tu posición GPS</div>`
           : (retraso > 0
             ? `<div class="seggps tarde">🛰 ~${retraso} min de retraso según tu posición GPS</div>`
             : `<div class="seggps">🛰 ~${-retraso} min adelantado según tu posición GPS</div>`);
+      } else if(retraso != null){
+        // aún sin confirmar que el dispositivo se mueve con el tren: no
+        // presentar como fiable un retraso calculado desde el andén
+        gps = `<div class="meta" style="margin-top:6px">🛰 Comprobando si has embarcado antes de estimar el retraso por GPS…</div>`;
       } else {
         gps = `<div class="meta" style="margin-top:6px">🛰 Con permiso de ubicación se estima el retraso real.</div>`;
       }
@@ -1892,9 +1909,40 @@ function tickSeguimiento(){
   if(segLegActivo && navigator.geolocation){
     const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
     const leg = segLegActivo;
+    if(segTrackLeg !== leg){
+      // nuevo tramo activo (arranque o transbordo): reiniciar la detección
+      // de embarque, que debe confirmarse tren a tren
+      segTrackLeg = leg;
+      segEmbarcado = false;
+      segMovCount = 0;
+      segUltimoFix = null;
+    }
     navigator.geolocation.getCurrentPosition(p => {
       if(!SEG || segLegActivo !== leg) return;
       segPosUsuario = {lat: p.coords.latitude, lon: p.coords.longitude};
+      // Detección de embarque: velocidad sostenida por encima de un paso
+      // rápido tras la salida indica que el dispositivo (y su dueño) se
+      // mueve con el tren. Se usa coords.speed cuando el GPS la ofrece; si
+      // no, se calcula con el desplazamiento entre dos fixes consecutivos.
+      if(!segEmbarcado){
+        let veloc = (p.coords.speed != null && !isNaN(p.coords.speed)) ? p.coords.speed*3.6 : null;
+        if(veloc == null && segUltimoFix){
+          const dKm = haversine(segUltimoFix.lat, segUltimoFix.lon, p.coords.latitude, p.coords.longitude);
+          const horas = (Date.now() - segUltimoFix.t)/3600000;
+          if(horas > 0) veloc = dKm/horas;
+        }
+        segUltimoFix = {t: Date.now(), lat: p.coords.latitude, lon: p.coords.longitude};
+        if(veloc != null && veloc >= UMBRAL_EMBARQUE_KMH){
+          segMovCount++;
+          if(segMovCount >= 2){
+            segEmbarcado = true;
+            segPreguntado = true; // movimiento confirmado: no hace falta seguir preguntando
+            toast('🚆 Movimiento detectado: parece que has embarcado');
+          }
+        } else {
+          segMovCount = 0;
+        }
+      }
       // dispositivo lejos de la ruta varias veces seguidas: preguntar si
       // se quiere seguir con el seguimiento
       if(!segPreguntado && !segPregunta){
