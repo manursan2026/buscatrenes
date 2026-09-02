@@ -22,20 +22,20 @@ TEMPLATE = """<!DOCTYPE html>
 <title>BuscaTrenes</title>
 <style>
   :root{
-    --bg:#0b1219; --panel:#151f2b; --panel2:#1e2b3a; --text:#e8edf2; --muted:#8fa1b3;
-    --accent:#3b82f6; --accent2:#2563eb; --border:#263646;
+    --bg:#17212c; --panel:#212e3d; --panel2:#2b3b4d; --text:#e8edf2; --muted:#8fa1b3;
+    --accent:#3b82f6; --accent2:#2563eb; --border:#35485d;
     --av:#e5484d; --ld:#f0883e; --md:#2fbf71; --cer:#3a9bdc; --ouigo:#e6007e;
     --fgc:#2e7d32; --eus:#00838f; --sfm:#c77c02;
   }
   *{box-sizing:border-box}
   body{margin:0;color:var(--text);background:var(--bg);
-       background-image:radial-gradient(900px 480px at 50% -10%, #16283c 0%, transparent 60%);
+       background-image:radial-gradient(900px 480px at 50% -10%, #26425e 0%, transparent 60%);
        background-repeat:no-repeat;
        font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
        -webkit-font-smoothing:antialiased;}
   .wrap{max-width:720px;margin:0 auto;padding:28px 14px 60px}
   h1{font-size:1.45rem;margin:34px 0 24px;letter-spacing:-.01em}
-  .card{background:linear-gradient(180deg,var(--panel) 0%,#121b26 100%);
+  .card{background:linear-gradient(180deg,var(--panel) 0%,#1d2836 100%);
         border:1px solid var(--border);border-radius:16px;padding:18px 16px;
         margin-bottom:14px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   label{display:block;font-size:.72rem;color:var(--muted);margin:12px 0 5px;
@@ -56,7 +56,7 @@ TEMPLATE = """<!DOCTYPE html>
         z-index:20;display:none;box-shadow:0 14px 32px rgba(0,0,0,.5)}
   .sugg div{padding:10px 12px;font-size:.92rem;cursor:pointer;border-bottom:1px solid var(--border)}
   .sugg div:last-child{border-bottom:none}
-  .sugg div:hover, .sugg div.active{background:#2f4356}
+  .sugg div:hover, .sugg div.active{background:#3b5269}
   .sugg small{color:var(--muted)}
   .geobtn{margin-top:8px;background:rgba(59,130,246,.08);
           border:1px solid rgba(59,130,246,.4);color:var(--accent);
@@ -73,7 +73,7 @@ TEMPLATE = """<!DOCTYPE html>
   button.buscar:active{transform:translateY(1px);box-shadow:0 3px 10px rgba(37,99,235,.3)}
   button.buscar:disabled{opacity:.5;box-shadow:none}
   #estado{color:var(--muted);font-size:.85rem;margin:14px 0}
-  .resultado{background:linear-gradient(180deg,var(--panel) 0%,#121b26 100%);
+  .resultado{background:linear-gradient(180deg,var(--panel) 0%,#1d2836 100%);
     border:1px solid var(--border);border-radius:14px;
     padding:14px 15px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
   .rescab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
@@ -101,7 +101,7 @@ TEMPLATE = """<!DOCTYPE html>
   .resfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
   .resfoot .meta{margin-top:0}
   #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
-    background:#2f4356;color:var(--text);padding:9px 16px;border-radius:999px;
+    background:#3b5269;color:var(--text);padding:9px 16px;border-radius:999px;
     font-size:.82rem;box-shadow:0 8px 22px rgba(0,0,0,.45);opacity:0;
     pointer-events:none;transition:opacity .25s;z-index:50;white-space:nowrap}
   #toast.visible{opacity:1}
@@ -111,7 +111,7 @@ TEMPLATE = """<!DOCTYPE html>
   .transbordo b{color:var(--text)}
   .tabs{display:flex;gap:5px;margin-bottom:16px;flex-wrap:wrap}
   .tab{flex:1 1 auto;padding:10px 4px;border-radius:10px;border:1px solid #2a4a6e;
-    background:#16324f;color:#b9cde4;font-size:.75rem;font-weight:700;
+    background:#1f3f61;color:#b9cde4;font-size:.75rem;font-weight:700;
     cursor:pointer;text-align:center;white-space:nowrap}
   .tab.active{background:rgba(59,130,246,.3);border-color:var(--accent);color:#fff}
   .tab[hidden]{display:none}
@@ -130,7 +130,7 @@ TEMPLATE = """<!DOCTYPE html>
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);
     border:1px solid var(--border);border-radius:999px;padding:6px 11px;
     font-size:.78rem;color:var(--text);cursor:pointer;max-width:100%}
-  .chip:active{background:#2f4356}
+  .chip:active{background:#3b5269}
   .chip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chip.favorita{background:linear-gradient(180deg,var(--accent),var(--accent2));
     border-color:var(--accent2);color:#fff}
@@ -155,7 +155,7 @@ TEMPLATE = """<!DOCTYPE html>
     border-left:3px solid #f0b429;background:rgba(240,180,41,.08);
     border-radius:8px;font-size:.8rem;color:var(--muted)}
   #seguimiento:empty{display:none}
-  .segcard{background:linear-gradient(180deg,#152a42 0%,#121b26 100%);
+  .segcard{background:linear-gradient(180deg,#21374f 0%,#1d2836 100%);
     border:1px solid var(--accent2);border-radius:16px;padding:14px 15px;
     margin-bottom:16px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
   .segcab{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1669,7 +1669,7 @@ function croquisSVG(){
   }
   let usuarioSvg = '';
   if(segPosUsuario){
-    usuarioSvg = `<circle cx="${X(segPosUsuario).toFixed(1)}" cy="${Y(segPosUsuario).toFixed(1)}" r="3.2" fill="#34d399" stroke="#0b1219" stroke-width="1.2"/>`;
+    usuarioSvg = `<circle cx="${X(segPosUsuario).toFixed(1)}" cy="${Y(segPosUsuario).toFixed(1)}" r="3.2" fill="#34d399" stroke="#17212c" stroke-width="1.2"/>`;
   }
 
   return `<svg class="croquis" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
