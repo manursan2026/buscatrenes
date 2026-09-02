@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Config local de Claude Code (permisos con rutas absolutas de cada máquina)
+.claude/settings.local.json
+
+# Artefactos intermedios del build del APK
+android_buscador/build/

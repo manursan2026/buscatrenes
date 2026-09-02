@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "BuscaTrenes",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/manursan/Documents/TRABAJO/BuscaTrenes && exec python3 -m http.server 8767"
+      ],
+      "port": 8767
+    }
+  ]
+}
