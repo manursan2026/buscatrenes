@@ -1225,13 +1225,31 @@ let segLegActivo = null; // leg en curso (para el GPS), null si no estamos en ma
 let segWake = null;      // wake lock de pantalla durante el viaje
 let segPregunta = false;  // mostrando "¿desea continuar el seguimiento?"
 let segPreguntado = false;// ya confirmado que sí: no volver a preguntar
-let segLejos = 0;         // posiciones GPS consecutivas lejos de la ruta
+let segLejosDesde = null; // instante del primer fix de una racha lejos de la ruta
 let segProg = null;       // {t0, s0}: ancla para detectar que no se avanza por la ruta
-let segEmbarcado = false; // true tras detectar movimiento sostenido: se asume que se ha subido al tren
+let segEmbarcado = false; // true tras confirmar que el dispositivo avanza con el tren
 let segTrackLeg = null;   // leg para el que se está acumulando la detección de embarque
-let segMovCount = 0;      // lecturas consecutivas de velocidad por encima del umbral de embarque
-let segUltimoFix = null;  // {t, lat, lon}: último fix GPS, para estimar velocidad si el navegador no la da
-const UMBRAL_EMBARQUE_KMH = 8; // por encima de un paso rápido: indica que vas en el tren
+let segS0 = null;         // progreso por la ruta (min de horario) del primer fix válido del tramo
+let segMovDesde = null;   // instante del primer fix de una racha a velocidad de tren
+let segUltimoFix = null;  // {t, lat, lon, acc}: último fix GPS aceptado (t = timestamp del fix)
+let segWatchId = null;    // id de watchPosition mientras hay un tramo en marcha
+let segGpsRefTs = 0;      // desde cuándo se cuenta la ausencia de fixes (arranque del watch, volver a primer plano)
+let segSinSenal = false;  // sin fix válido desde hace un rato (túnel, sin cobertura GPS)
+let segGpsDenegado = false;
+let segDelayCand = null;  // {r, n}: retraso discordante con el actual, pendiente de confirmarse
+let segRenderTs = 0;      // último repintado provocado por un fix (throttle)
+// El GPS solo se usa en la app (WebView con puente AndroidNet): en un navegador
+// de escritorio no hay GPS y watchPosition en alta precisión falla siempre.
+const SEG_ES_APP = !!(window.AndroidNet && AndroidNet.fetch);
+const SEG_ACC_VEL_M = 150;    // precisión máxima (m) de un fix para velocidad/embarque
+const SEG_ACC_RET_M = 1000;   // precisión máxima (m) de un fix para estimar el retraso
+const SEG_EMBARQUE_MIN = 2;   // min de horario avanzados por la ruta que confirman el embarque
+const SEG_VEL_TREN_KMH = 15;  // velocidad sostenida durante SEG_VEL_TREN_MS que confirma el embarque
+const SEG_VEL_TREN_MS = 20000;
+const SEG_VEL_PARADO_KMH = 8; // por debajo se corta la racha (andando por el andén)
+const SEG_LEJOS_MS = 60000;   // tiempo seguido a >5 km de la ruta antes de preguntar
+const SEG_SIN_SENAL_MS = 45000;
+const SEG_SALTO_RET_MIN = 8;  // un retraso que difiera más de esto del actual necesita repetirse
 
 function segDesdeTrip(trip, ini, fin){
   // paradas: el tramo que se viaja; todas: el recorrido completo del tren,
@@ -1254,12 +1272,12 @@ function iniciarSeguimiento(legs, fechaISO){
   segPosUsuario = null;
   segPregunta = false;
   segPreguntado = false;
-  segLejos = 0;
+  segLejosDesde = null;
   segProg = null;
   segEmbarcado = false;
   segTrackLeg = null;
-  segMovCount = 0;
-  segUltimoFix = null;
+  segGpsDenegado = false;
+  segResetTramo();
   if(segTimer) clearInterval(segTimer);
   segTimer = setInterval(tickSeguimiento, 30000);
   tickSeguimiento();
@@ -1275,13 +1293,13 @@ function pararSeguimiento(){
   segPosUsuario = null;
   segPregunta = false;
   segPreguntado = false;
-  segLejos = 0;
+  segLejosDesde = null;
   segProg = null;
   segEmbarcado = false;
   segTrackLeg = null;
-  segMovCount = 0;
-  segUltimoFix = null;
+  segResetTramo();
   segLegActivo = null;
+  segPararGPS();
   if(segTimer){ clearInterval(segTimer); segTimer = null; }
   document.getElementById('seguimiento').innerHTML = '';
   segWakeLock(false);
@@ -1311,7 +1329,10 @@ function fmtRestante(min){
 // debería estar según horario: proyecta la posición sobre el tramo más
 // cercano entre estaciones consecutivas y convierte esa fracción en la hora
 // teórica de paso; retraso = ahora - esa hora. Solo si estás a <5 km de la ruta.
-function retrasoDesdePos(leg, lat, lon, nowMin){
+// Solo se consideran los tramos cuyo retraso resultante cae en [rMin, rMax]:
+// evita proyectar sobre una parte del recorrido por la que el tren pasó hace
+// horas o pasará mucho después (líneas que se pliegan sobre sí mismas).
+function retrasoDesdePos(leg, lat, lon, nowMin, rMin = -30, rMax = 180){
   const P = leg.paradas;
   let best = null;
   const kx = 111.32*Math.cos(lat*Math.PI/180), ky = 110.57; // km por grado
@@ -1324,11 +1345,12 @@ function retrasoDesdePos(leg, lat, lon, nowMin){
     t = Math.max(0, Math.min(1, t));
     const px=ax+dx*t, py=ay+dy*t;
     const dist = Math.sqrt(px*px+py*py);
-    if(!best || dist < best.dist){
-      const dep = P[i][2] >= 0 ? P[i][2] : P[i][1];
-      const arr = P[i+1][1] >= 0 ? P[i+1][1] : P[i+1][2];
-      best = {dist, tSched: dep + (arr-dep)*t};
-    }
+    const dep = P[i][2] >= 0 ? P[i][2] : P[i][1];
+    const arr = P[i+1][1] >= 0 ? P[i+1][1] : P[i+1][2];
+    const tSched = dep + (arr-dep)*t;
+    const r = nowMin - tSched;
+    if(r < rMin || r > rMax) continue;
+    if(!best || dist < best.dist) best = {dist, tSched};
   }
   if(!best || best.dist > 5) return null;
   return nowMin - best.tSched;
@@ -1755,7 +1777,7 @@ function renderSeguimiento(){
     cont.querySelector('.bsi').addEventListener('click', () => {
       segPregunta = false;
       segPreguntado = true;
-      segLejos = 0;
+      segLejosDesde = null;
       segProg = null;
       tickSeguimiento();
     });
@@ -1829,6 +1851,17 @@ function renderSeguimiento(){
           : (oficial > 0
             ? `<div class="seggps tarde">📡 ~${oficial} min de retraso (${fuente})</div>`
             : `<div class="seggps">📡 ~${-oficial} min adelantado (${fuente})</div>`);
+      } else if(!SEG_ES_APP){
+        gps = `<div class="meta" style="margin-top:6px">🛰 El retraso por posición GPS solo se estima en la app.</div>`;
+      } else if(segGpsDenegado){
+        gps = `<div class="meta" style="margin-top:6px">🛰 Sin permiso de ubicación no se puede estimar el retraso.</div>`;
+      } else if(segSinSenal){
+        // túnel o sin cobertura: no se pierde el estado; se conserva el último
+        // retraso conocido y la posición del tren avanza por horario
+        const ult = retraso != null && segEmbarcado
+          ? (Math.abs(retraso) < 2 ? 'en hora' : (retraso > 0 ? `~${retraso} min de retraso` : `~${-retraso} min adelantado`)) + ' según la última posición'
+          : 'estimando por horario';
+        gps = `<div class="seggps tarde">🛰 Sin señal GPS (¿túnel?) · ${ult}</div>`;
       } else if(retraso != null && segEmbarcado){
         gps = Math.abs(retraso) < 2
           ? `<div class="seggps">🛰 En hora según tu posición GPS</div>`
@@ -1840,7 +1873,7 @@ function renderSeguimiento(){
         // presentar como fiable un retraso calculado desde el andén
         gps = `<div class="meta" style="margin-top:6px">🛰 Comprobando si has embarcado antes de estimar el retraso por GPS…</div>`;
       } else {
-        gps = `<div class="meta" style="margin-top:6px">🛰 Con permiso de ubicación se estima el retraso real.</div>`;
+        gps = `<div class="meta" style="margin-top:6px">🛰 Esperando señal GPS para estimar el retraso real.</div>`;
       }
     }
   }
@@ -1882,6 +1915,7 @@ function renderSeguimiento(){
   </div>`;
   cont.querySelector('.stopseg').addEventListener('click', pararSeguimiento);
   segWakeLock(enViaje);
+  segSyncGPS();
 }
 
 function tickSeguimiento(){
@@ -1890,80 +1924,176 @@ function tickSeguimiento(){
   // dato oficial GTFS-RT (Cercanías): consulta cada ~60 s
   const legRT = segLegParaRT();
   if(legRT && Date.now() - segRTts > 55000) actualizarRTSeguimiento(legRT);
-  if(segLegActivo && navigator.geolocation){
-    const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
-    const leg = segLegActivo;
-    if(segTrackLeg !== leg){
-      // nuevo tramo activo (arranque o transbordo): reiniciar la detección
-      // de embarque, que debe confirmarse tren a tren
-      segTrackLeg = leg;
-      segEmbarcado = false;
-      segMovCount = 0;
-      segUltimoFix = null;
+  segSyncGPS();
+  // con el watch activo y sin fix válido desde hace un rato: túnel o sin
+  // cobertura. Se conserva el estado; la tarjeta lo indica.
+  if(segWatchId != null && !segSinSenal && segSinFixMs() > SEG_SIN_SENAL_MS){
+    segSinSenal = true;
+    segPosUsuario = null;
+    renderSeguimiento();
+  }
+}
+
+function segResetTramo(){
+  segS0 = null;
+  segMovDesde = null;
+  segUltimoFix = null;
+  segSinSenal = false;
+  segDelayCand = null;
+}
+
+function segSinFixMs(){
+  return Date.now() - Math.max(segUltimoFix ? segUltimoFix.t : 0, segGpsRefTs);
+}
+
+// Arranca o para el watchPosition según la fase: solo mientras un tramo está
+// en marcha (en andén, transbordo o al terminar no se gasta batería). Idempotente.
+function segSyncGPS(){
+  const quiere = !!(SEG && segLegActivo && SEG_ES_APP && !segGpsDenegado && navigator.geolocation);
+  if(quiere && segTrackLeg !== segLegActivo){
+    // nuevo tramo activo (arranque o transbordo): el embarque se confirma
+    // tren a tren
+    segTrackLeg = segLegActivo;
+    segEmbarcado = false;
+    segResetTramo();
+  }
+  if(quiere && segWatchId == null){
+    // alta precisión y sin caché: es la única forma de que Android mantenga
+    // el GPS encendido y entregue fixes frecuentes con velocidad real. Con
+    // getCurrentPosition en baja precisión llegaban posiciones por antena
+    // (100 m - 2 km de error, sin velocidad, muchas veces repetidas).
+    segGpsRefTs = Date.now();
+    segWatchId = navigator.geolocation.watchPosition(segOnFix, segOnErr,
+      {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
+  } else if(!quiere && segWatchId != null){
+    segPararGPS();
+  }
+}
+
+function segPararGPS(){
+  if(segWatchId != null && navigator.geolocation) navigator.geolocation.clearWatch(segWatchId);
+  segWatchId = null;
+}
+
+function segOnErr(e){
+  if(!SEG || !segLegActivo) return;
+  if(e && e.code === 1){ // PERMISSION_DENIED
+    segGpsDenegado = true;
+    segPararGPS();
+    renderSeguimiento();
+    return;
+  }
+  // TIMEOUT / POSITION_UNAVAILABLE: el watch sigue vivo y volverá a entregar
+  // fixes al salir del túnel; mientras tanto, "sin señal" conservando el estado
+  if(!segSinSenal && segSinFixMs() > SEG_SIN_SENAL_MS){
+    segSinSenal = true;
+    segPosUsuario = null;
+    renderSeguimiento();
+  }
+}
+
+function segConfirmarEmbarque(){
+  if(segEmbarcado) return;
+  segEmbarcado = true;
+  segPreguntado = true; // movimiento confirmado: no hace falta seguir preguntando
+  segProg = null;
+  toast('🚆 Movimiento detectado: parece que has embarcado');
+}
+
+function segOnFix(p){
+  if(!SEG || !segLegActivo) return;
+  segSyncGPS(); // el tramo activo puede haber cambiado en un repintado entre ticks
+  const leg = segLegActivo;
+  const acc = (p.coords.accuracy != null && !isNaN(p.coords.accuracy)) ? p.coords.accuracy : 9999;
+  const t = p.timestamp || Date.now();
+  // fix repetido/cacheado o demasiado impreciso para cualquier uso: se ignora
+  // sin tocar ningún contador (antes un fix repetido reseteaba la detección)
+  if(segUltimoFix && t <= segUltimoFix.t) return;
+  if(acc > SEG_ACC_RET_M) return;
+  const lat = p.coords.latitude, lon = p.coords.longitude;
+  const base = new Date(SEG.fechaISO + 'T00:00:00').getTime();
+  const tG = (t - base)/60000; // instante del fix, no del callback
+  let cambio = segSinSenal;
+  segSinSenal = false;
+  segPosUsuario = {lat, lon};
+
+  // posición proyectada sobre la ruta, en minutos de horario: s = tG - r
+  const r = retrasoDesdePos(leg, lat, lon, tG, -5, 90);
+  const s = r != null ? tG - r : null;
+
+  if(!segEmbarcado && acc <= SEG_ACC_VEL_M){
+    // (a) avance acumulado por la ruta desde el primer fix bueno del tramo:
+    // robusto a paradas intermedias, huecos de señal y ruido
+    if(s != null){
+      if(segS0 == null) segS0 = s;
+      else if(s - segS0 >= SEG_EMBARQUE_MIN) segConfirmarEmbarque();
     }
-    navigator.geolocation.getCurrentPosition(p => {
-      if(!SEG || segLegActivo !== leg) return;
-      segPosUsuario = {lat: p.coords.latitude, lon: p.coords.longitude};
-      // Detección de embarque: velocidad sostenida por encima de un paso
-      // rápido tras la salida indica que el dispositivo (y su dueño) se
-      // mueve con el tren. Se usa coords.speed cuando el GPS la ofrece; si
-      // no, se calcula con el desplazamiento entre dos fixes consecutivos.
-      if(!segEmbarcado){
-        let veloc = (p.coords.speed != null && !isNaN(p.coords.speed)) ? p.coords.speed*3.6 : null;
-        if(veloc == null && segUltimoFix){
-          const dKm = haversine(segUltimoFix.lat, segUltimoFix.lon, p.coords.latitude, p.coords.longitude);
-          const horas = (Date.now() - segUltimoFix.t)/3600000;
-          if(horas > 0) veloc = dKm/horas;
-        }
-        segUltimoFix = {t: Date.now(), lat: p.coords.latitude, lon: p.coords.longitude};
-        if(veloc != null && veloc >= UMBRAL_EMBARQUE_KMH){
-          segMovCount++;
-          if(segMovCount >= 2){
-            segEmbarcado = true;
-            segPreguntado = true; // movimiento confirmado: no hace falta seguir preguntando
-            toast('🚆 Movimiento detectado: parece que has embarcado');
-          }
-        } else {
-          segMovCount = 0;
-        }
+    // (b) velocidad de tren sostenida: detección rápida en cuanto arranca.
+    // coords.speed la da el GPS; si falta, desplazamiento entre fixes buenos
+    let veloc = (p.coords.speed != null && !isNaN(p.coords.speed)) ? p.coords.speed*3.6 : null;
+    if(veloc == null && segUltimoFix && segUltimoFix.acc <= SEG_ACC_VEL_M && t - segUltimoFix.t >= 5000){
+      veloc = haversine(segUltimoFix.lat, segUltimoFix.lon, lat, lon) / ((t - segUltimoFix.t)/3600000);
+    }
+    if(veloc != null){
+      if(veloc >= SEG_VEL_TREN_KMH){
+        if(segMovDesde == null) segMovDesde = t;
+        else if(t - segMovDesde >= SEG_VEL_TREN_MS) segConfirmarEmbarque();
+      } else if(veloc < SEG_VEL_PARADO_KMH){
+        segMovDesde = null;
       }
-      // dispositivo lejos de la ruta varias veces seguidas: preguntar si
-      // se quiere seguir con el seguimiento
-      if(!segPreguntado && !segPregunta){
-        if(distKmARuta(leg.paradas, p.coords.latitude, p.coords.longitude) > 5){
-          segLejos++;
-          if(segLejos >= 3){ segPregunta = true; renderSeguimiento(); return; }
-        } else {
-          segLejos = 0;
-        }
-      }
-      const nowG = (Date.now() - base)/60000;
-      const r = retrasoDesdePos(leg, p.coords.latitude, p.coords.longitude, nowG);
-      if(r != null){
-        // detección de "no vas montado": con el tren en marcha, la posición
-        // del dispositivo proyectada sobre la ruta (nowG - r) debe avanzar;
-        // si lleva ~3 min clavada (p. ej. viendo el tren desde el andén),
-        // preguntar si se desea continuar el seguimiento
-        if(!segPreguntado && !segPregunta){
-          const s = nowG - r;
-          if(segProg == null || s > segProg.s0 + 1.5){
-            segProg = {t0: nowG, s0: s};
-          } else if(nowG - segProg.t0 >= 3){
-            segProg = null;
-            segPregunta = true;
-            renderSeguimiento();
-            return;
-          }
-        }
-        segDelay = segDelay == null ? r : (segDelay + r)/2;
+    }
+    if(segEmbarcado) cambio = true;
+  }
+  segUltimoFix = {t, lat, lon, acc};
+
+  // dispositivo lejos de la ruta durante un rato: preguntar si se quiere
+  // seguir con el seguimiento
+  if(!segPreguntado && !segPregunta){
+    if(distKmARuta(leg.paradas, lat, lon) > 5){
+      if(segLejosDesde == null) segLejosDesde = t;
+      else if(t - segLejosDesde >= SEG_LEJOS_MS){ segPregunta = true; renderSeguimiento(); return; }
+    } else {
+      segLejosDesde = null;
+    }
+  }
+  if(r != null){
+    // detección de "no vas montado": con el tren en marcha, la posición
+    // proyectada sobre la ruta debe avanzar; si lleva ~3 min clavada (p. ej.
+    // viendo el tren desde el andén), preguntar. Solo cuenta con fixes
+    // válidos: un túnel no dispara la pregunta.
+    if(!segPreguntado && !segPregunta){
+      if(segProg == null || s > segProg.s0 + 1.5){
+        segProg = {t0: tG, s0: s};
+      } else if(tG - segProg.t0 >= 3){
+        segProg = null;
+        segPregunta = true;
         renderSeguimiento();
+        return;
       }
-    }, () => {}, {enableHighAccuracy: false, timeout: 8000, maximumAge: 20000});
+    }
+    // retraso suavizado; un salto grande respecto al actual solo se acepta
+    // si se repite (posición mal proyectada en un cruce o a la salida de un túnel)
+    if(segDelay == null || Math.abs(r - segDelay) <= SEG_SALTO_RET_MIN){
+      segDelay = segDelay == null ? r : segDelay*0.7 + r*0.3;
+      segDelayCand = null;
+    } else if(segDelayCand && Math.abs(r - segDelayCand.r) <= 3){
+      if(++segDelayCand.n >= 3){ segDelay = r; segDelayCand = null; }
+    } else {
+      segDelayCand = {r, n: 1};
+    }
+  }
+  // con fixes cada pocos segundos, repintar como mucho cada 5 s salvo cambio de estado
+  if(cambio || Date.now() - segRenderTs > 5000){
+    segRenderTs = Date.now();
+    renderSeguimiento();
   }
 }
 
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible' && SEG) tickSeguimiento();
+  if(document.visibilityState === 'visible' && SEG){
+    segGpsRefTs = Date.now(); // con la pantalla apagada no llegan fixes: no es "sin señal"
+    tickSeguimiento();
+  }
 });
 
 function textoDirecto(r){
