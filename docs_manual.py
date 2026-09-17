@@ -187,7 +187,7 @@ story += [P("La aplicación se distribuye como un fichero <b>buscador_trenes.apk
                    "Pulsa <b>Instalar</b>. Si ya tenías una versión anterior, se actualiza encima y conserva tus trayectos favoritos."]),
           note("Cada nueva versión del APK lleva horarios más recientes. Cuando la aplicación detecte que sus horarios tienen más de dos meses, "
                "mostrará un aviso en la parte superior recomendando actualizar.", NARANJA, "Aviso"),
-          figrow([("16_icono", "Icono de BuscaTrenes en el cajón de aplicaciones", (560, 1980)), ("01_inicio", "Pantalla inicial tras abrir la aplicación")], 6.2*cm)]
+          figrow([("16_icono_marcado", "Icono de BuscaTrenes en el cajón de aplicaciones"), ("01_inicio", "Pantalla inicial tras abrir la aplicación")], 6.2*cm)]
 story += H2("2.2 Probar la aplicación en el emulador")
 story += [P("Si tienes un Mac con Android Studio instalado, en la carpeta del proyecto encontrarás <b>Abrir_Emulador.command</b>: con doble clic "
             "arranca el emulador de Android, instala el APK más reciente y abre BuscaTrenes, sin necesidad de un teléfono.")]
