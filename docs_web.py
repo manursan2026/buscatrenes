@@ -1,21 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Página web de descargas de BuscaTrenes.
-  docs_web.py          -> docs/index.html para GitHub Pages; los enlaces apuntan a la última release de GitHub
-  docs_web.py --local  -> Web/index.html con enlaces relativos, junto al APK, el manual y las capturas,
-                          para subir la carpeta Web/ entera a cualquier otro alojamiento
-Las capturas de manual/ se reducen a <destino>/img/*.jpg."""
-import os, re, sys, shutil, datetime
+"""Página web de descargas de BuscaTrenes: genera la carpeta Web/ autocontenida
+(index.html con enlaces relativos + buscador_trenes.apk + Manual_BuscaTrenes.pdf + img/),
+lista para copiar entera a cualquier alojamiento."""
+import os, re, shutil, datetime
 from PIL import Image
 
-LOCAL = "--local" in sys.argv
 S = os.path.dirname(os.path.abspath(__file__))
-D = os.path.join(S, "Web" if LOCAL else "docs"); IMG = os.path.join(D, "img")
+D = os.path.join(S, "Web"); IMG = os.path.join(D, "img")
 os.makedirs(IMG, exist_ok=True)
-REPO = "https://github.com/manursan2026/buscatrenes"
-REL = "" if LOCAL else REPO + "/releases/latest/download/"
-if LOCAL:
-    for f in ("buscador_trenes.apk", "Manual_BuscaTrenes.pdf"):
-        shutil.copy2(os.path.join(S, f), os.path.join(D, f))
+for f in ("buscador_trenes.apk", "Manual_BuscaTrenes.pdf"):
+    shutil.copy2(os.path.join(S, f), os.path.join(D, f))
 VERSION = re.search(r'versionName="([^"]+)"', open(os.path.join(S, "android_buscador", "AndroidManifest.xml")).read()).group(1)
 DATA_FECHA = re.search(r'const DATA_FECHA = "(\d{4}-\d{2}-\d{2})"', open(os.path.join(S, "buscador_trenes.html")).read()).group(1)
 DATA_FECHA_TXT = "%s/%s/%s" % (DATA_FECHA[8:10], DATA_FECHA[5:7], DATA_FECHA[0:4])
@@ -107,11 +101,11 @@ page = f"""<!DOCTYPE html>
       <h1>BuscaTrenes</h1>
       <p class="lead">Buscador de trenes para Android que funciona sin conexión: horarios de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca, con transbordos automáticos, salidas por estación, incidencias y seguimiento del viaje.</p>
       <div class="botones">
-        <a class="btn apk" href="{REL}buscador_trenes.apk" download>
+        <a class="btn apk" href="buscador_trenes.apk" download>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.4 11.4 0 0 0-8.94 0L5.65 5.67a.63.63 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
           <span>Descargar APK<small>Android 7.0 o superior · {apk:.1f} MB · horarios del {DATA_FECHA_TXT}</small></span>
         </a>
-        <a class="btn pdf" href="{REL}Manual_BuscaTrenes.pdf" download>
+        <a class="btn pdf" href="Manual_BuscaTrenes.pdf" download>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 13h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>
           <span>Manual de usuario<small>PDF · {pdf:.1f} MB</small></span>
         </a>
@@ -171,8 +165,8 @@ page = f"""<!DOCTYPE html>
   <h2><span style="background:var(--morado)"></span>Descargas</h2>
   <p class="sub">Versión {VERSION} · horarios extraídos el {DATA_FECHA_TXT} · página actualizada el {fecha}.</p>
   <div class="dl">
-    <div class="card"><h3>Aplicación Android</h3><p>Instalable en cualquier Android 7.0 o superior. Firmada con clave de desarrollo: si ya tienes instalada una versión compilada en otro ordenador, desinstálala antes.</p><a class="btn apk" href="{REL}buscador_trenes.apk" download>Descargar buscador_trenes.apk ({apk:.1f} MB)</a></div>
-    <div class="card"><h3>Manual de usuario</h3><p>Guía completa con capturas: instalación, búsqueda, transbordos, seguimiento, salidas, incidencias, origen de los datos y preguntas frecuentes.</p><a class="btn pdf" href="{REL}Manual_BuscaTrenes.pdf" download>Descargar Manual_BuscaTrenes.pdf ({pdf:.1f} MB)</a></div>
+    <div class="card"><h3>Aplicación Android</h3><p>Instalable en cualquier Android 7.0 o superior. Firmada con clave de desarrollo: si ya tienes instalada una versión compilada en otro ordenador, desinstálala antes.</p><a class="btn apk" href="buscador_trenes.apk" download>Descargar buscador_trenes.apk ({apk:.1f} MB)</a></div>
+    <div class="card"><h3>Manual de usuario</h3><p>Guía completa con capturas: instalación, búsqueda, transbordos, seguimiento, salidas, incidencias, origen de los datos y preguntas frecuentes.</p><a class="btn pdf" href="Manual_BuscaTrenes.pdf" download>Descargar Manual_BuscaTrenes.pdf ({pdf:.1f} MB)</a></div>
   </div>
 </section>
 
@@ -187,7 +181,4 @@ page = f"""<!DOCTYPE html>
 </html>
 """
 open(os.path.join(D, "index.html"), "w", encoding="utf-8").write(page)
-if not LOCAL:
-    open(os.path.join(D, ".nojekyll"), "w").close()
-print("Generado %s/index.html (%d KB) + %d capturas en img/%s" % (os.path.basename(D), len(page.encode()) // 1024, len(SHOTS),
-      " + APK y manual copiados" if LOCAL else ""))
+print("Generado Web/index.html (%d KB) + %d capturas en Web/img + APK y manual copiados" % (len(page.encode()) // 1024, len(SHOTS)))

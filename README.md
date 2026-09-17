@@ -29,11 +29,10 @@ llamadas de red en tiempo de uso.
   app. Requiere Android Studio con el AVD `Medium_Phone_API_36.1`.
 - `manual/` + `docs_manual.py` — capturas del emulador y generador del
   `Manual_BuscaTrenes.pdf` (reportlab).
-- `docs/` + `docs_web.py` — página web de descargas publicada con GitHub
-  Pages (enlaza al APK y al manual de la última release). Con `--local`
-  genera en su lugar `Web/` (no versionada): la misma página con enlaces
-  relativos y el APK, el PDF y las capturas al lado, lista para copiar
-  entera a cualquier otro servidor.
+- `docs_web.py` — genera `Web/` (no versionada): página de descargas
+  `index.html` con enlaces relativos y, al lado, el APK, el manual PDF y
+  las capturas reducidas; la carpeta se copia entera al alojamiento que se
+  quiera.
 
 ## Regenerar todo
 
@@ -42,8 +41,7 @@ python3 build_buscador_data.py        # descarga los GTFS -> buscador_data.b64
 python3 generar_buscador_html.py       # genera buscador_trenes.html
 android_buscador/build_apk.sh          # genera buscador_trenes.apk (ver requisitos en android_buscador/README.md)
 python3 docs_manual.py                 # Manual_BuscaTrenes.pdf a partir de manual/*.png
-python3 docs_web.py                    # docs/index.html (GitHub Pages) con las capturas reducidas
-python3 docs_web.py --local            # Web/ autocontenida: index.html + APK + PDF + img/, para cualquier otro alojamiento
+python3 docs_web.py                    # Web/ autocontenida: index.html + APK + PDF + img/, para subir a cualquier alojamiento
 ```
 
 Requiere Python 3 con `pandas`, `requests`, `reportlab` y `Pillow`.
@@ -55,18 +53,14 @@ scripts de documentación.
 
 ## Publicar una versión nueva
 
-La web y los enlaces de descarga viven en GitHub:
+El código vive en GitHub (<https://github.com/manursan2026/buscatrenes>);
+la página de descargas se aloja aparte, copiando la carpeta `Web/`.
 
-- Repositorio: <https://github.com/manursan2026/buscatrenes>
-- Página de descargas (GitHub Pages desde `docs/`): <https://manursan2026.github.io/buscatrenes/>
-
-Tras regenerar todo, commit y push, y publicar una release con los dos
-ficheros que enlaza la web (APK y manual):
+Tras regenerar todo, commit y push, publicar una release con el APK y el
+manual, y volver a subir `Web/` al alojamiento:
 
 ```bash
 gh release create v1.0-$(date +%Y.%m.%d) buscador_trenes.apk Manual_BuscaTrenes.pdf \
   --title "BuscaTrenes · horarios del $(date +%d/%m/%Y)" --notes "Horarios GTFS regenerados."
 ```
 
-Los enlaces `releases/latest/download/...` de la web apuntan siempre a la
-última release, así que no hay que tocar el HTML.
