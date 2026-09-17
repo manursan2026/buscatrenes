@@ -8,7 +8,7 @@ que pide es de ubicación, para el botón "Usar mi ubicación" del buscador.
 ## Pipeline completo (por este orden)
 
 ```bash
-cd ..                                  # raíz del proyecto (GENERAR_CVM)
+cd ..                                  # raíz del proyecto (BuscaTrenes)
 python3 build_buscador_data.py         # descarga los GTFS -> buscador_data.b64
 python3 generar_buscador_html.py       # incrusta el .b64 en buscador_trenes.html
 android_buscador/build_apk.sh          # empaqueta y firma buscador_trenes.apk

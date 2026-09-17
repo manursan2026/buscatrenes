@@ -6,3 +6,6 @@
 
 # Artefactos intermedios del build del APK
 android_buscador/build/
+
+# Intermedios del manual (JPG reducidos que genera docs_manual.py)
+manual/_emb_*
