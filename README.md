@@ -30,7 +30,7 @@ llamadas de red en tiempo de uso.
 - `manual/` + `docs_manual.py` — capturas del emulador y generador del
   `Manual_BuscaTrenes.pdf` (reportlab).
 - `docs/` + `docs_web.py` — página web de descargas publicada con GitHub
-  Pages (enlaza al APK, al HTML y al manual de la última release).
+  Pages (enlaza al APK y al manual de la última release).
 
 ## Regenerar todo
 
@@ -56,11 +56,11 @@ La web y los enlaces de descarga viven en GitHub:
 - Repositorio: <https://github.com/manursan2026/buscatrenes>
 - Página de descargas (GitHub Pages desde `docs/`): <https://manursan2026.github.io/buscatrenes/>
 
-Tras regenerar todo, commit y push, y publicar una release con los tres
-ficheros que enlaza la web:
+Tras regenerar todo, commit y push, y publicar una release con los dos
+ficheros que enlaza la web (APK y manual):
 
 ```bash
-gh release create v1.0-$(date +%Y.%m.%d) buscador_trenes.apk buscador_trenes.html Manual_BuscaTrenes.pdf \
+gh release create v1.0-$(date +%Y.%m.%d) buscador_trenes.apk Manual_BuscaTrenes.pdf \
   --title "BuscaTrenes · horarios del $(date +%d/%m/%Y)" --notes "Horarios GTFS regenerados."
 ```
 

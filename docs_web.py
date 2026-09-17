@@ -13,7 +13,6 @@ VERSION = re.search(r'versionName="([^"]+)"', open(os.path.join(S, "android_busc
 DATA_FECHA = re.search(r'const DATA_FECHA = "(\d{4}-\d{2}-\d{2})"', open(os.path.join(S, "buscador_trenes.html")).read()).group(1)
 DATA_FECHA_TXT = "%s/%s/%s" % (DATA_FECHA[8:10], DATA_FECHA[5:7], DATA_FECHA[0:4])
 apk = os.path.getsize(os.path.join(S, "buscador_trenes.apk")) / 1e6
-html = os.path.getsize(os.path.join(S, "buscador_trenes.html")) / 1e6
 pdf = os.path.getsize(os.path.join(S, "Manual_BuscaTrenes.pdf")) / 1e6
 fecha = datetime.date.today().strftime("%d/%m/%Y")
 
@@ -54,7 +53,6 @@ page = f"""<!DOCTYPE html>
   .btn:hover {{ transform:translateY(-2px); }}
   .btn.apk {{ background:var(--amarillo); color:#1F2937; }}
   .btn.pdf {{ background:#fff; color:var(--azul); }}
-  .btn.web {{ background:rgba(255,255,255,.14); color:#fff; border:1px solid rgba(255,255,255,.35); }}
   .btn small {{ display:block; font-weight:400; font-size:.8rem; opacity:.75; }}
   .btn svg {{ width:26px; height:26px; flex:none; }}
   main section {{ padding:44px 0; border-bottom:1px solid var(--linea); }}
@@ -77,7 +75,7 @@ page = f"""<!DOCTYPE html>
   .dl .card {{ display:flex; flex-direction:column; gap:10px; }}
   .dl .btn {{ align-self:flex-start; box-shadow:none; border:2px solid var(--linea); }}
   .dl .btn.apk {{ border-color:transparent; }}
-  .dl .btn.pdf, .dl .btn.web {{ background:var(--azul); color:#fff; border-color:transparent; }}
+  .dl .btn.pdf {{ background:var(--azul); color:#fff; border-color:transparent; }}
   .nota {{ background:rgba(255,200,87,.18); border-left:4px solid var(--amarillo); padding:12px 16px; border-radius:8px; font-size:.95rem; }}
   .ops {{ display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }}
   .ops span {{ background:var(--tarjeta); border:1px solid var(--linea); border-radius:999px; padding:5px 14px; font-size:.9rem; font-weight:600; }}
@@ -109,10 +107,6 @@ page = f"""<!DOCTYPE html>
         <a class="btn pdf" href="{REL}Manual_BuscaTrenes.pdf">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 13h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>
           <span>Manual de usuario<small>PDF · {pdf:.1f} MB</small></span>
-        </a>
-        <a class="btn web" href="{REL}buscador_trenes.html">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.9 9h-2.95a15.7 15.7 0 0 0-1.4-6.05A8.03 8.03 0 0 1 18.9 11zM12 4c.83 1.2 1.85 3.5 2.05 7h-4.1C10.15 7.5 11.17 5.2 12 4zM5.1 11a8.03 8.03 0 0 1 4.35-6.05A15.7 15.7 0 0 0 8.05 11H5.1zm0 2h2.95c.1 2.3.6 4.4 1.4 6.05A8.03 8.03 0 0 1 5.1 13zM12 20c-.83-1.2-1.85-3.5-2.05-7h4.1c-.2 3.5-1.22 5.8-2.05 7zm2.55-.95c.8-1.65 1.3-3.75 1.4-6.05h2.95a8.03 8.03 0 0 1-4.35 6.05z"/></svg>
-          <span>Versión web<small>Un solo fichero HTML · {html:.1f} MB · para el navegador</small></span>
         </a>
       </div>
     </div>
@@ -172,7 +166,6 @@ page = f"""<!DOCTYPE html>
   <div class="dl">
     <div class="card"><h3>Aplicación Android</h3><p>Instalable en cualquier Android 7.0 o superior. Firmada con clave de desarrollo: si ya tienes instalada una versión compilada en otro ordenador, desinstálala antes.</p><a class="btn apk" href="{REL}buscador_trenes.apk">Descargar buscador_trenes.apk ({apk:.1f} MB)</a></div>
     <div class="card"><h3>Manual de usuario</h3><p>Guía completa con capturas: instalación, búsqueda, transbordos, seguimiento, salidas, incidencias, origen de los datos y preguntas frecuentes.</p><a class="btn pdf" href="{REL}Manual_BuscaTrenes.pdf">Descargar Manual_BuscaTrenes.pdf ({pdf:.1f} MB)</a></div>
-    <div class="card"><h3>Versión web</h3><p>El mismo buscador en un único fichero HTML que se abre en cualquier navegador de ordenador o móvil, sin instalar nada.</p><a class="btn web" href="{REL}buscador_trenes.html">Descargar buscador_trenes.html ({html:.1f} MB)</a></div>
   </div>
 </section>
 
@@ -180,8 +173,7 @@ page = f"""<!DOCTYPE html>
 </main>
 
 <footer>
-  BuscaTrenes · Datos horarios públicos (GTFS) de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca. Aplicación independiente, sin relación con los operadores.<br>
-  Código fuente en <a href="{REPO}">GitHub</a> · <a href="{REPO}/releases">Todas las versiones</a>
+  BuscaTrenes · Datos horarios públicos (GTFS) de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca. Aplicación independiente, sin relación con los operadores.
 </footer>
 
 </body>
