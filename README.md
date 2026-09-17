@@ -30,7 +30,10 @@ llamadas de red en tiempo de uso.
 - `manual/` + `docs_manual.py` — capturas del emulador y generador del
   `Manual_BuscaTrenes.pdf` (reportlab).
 - `docs/` + `docs_web.py` — página web de descargas publicada con GitHub
-  Pages (enlaza al APK y al manual de la última release).
+  Pages (enlaza al APK y al manual de la última release). Con `--local`
+  genera en su lugar `Web/` (no versionada): la misma página con enlaces
+  relativos y el APK, el PDF y las capturas al lado, lista para copiar
+  entera a cualquier otro servidor.
 
 ## Regenerar todo
 
@@ -40,6 +43,7 @@ python3 generar_buscador_html.py       # genera buscador_trenes.html
 android_buscador/build_apk.sh          # genera buscador_trenes.apk (ver requisitos en android_buscador/README.md)
 python3 docs_manual.py                 # Manual_BuscaTrenes.pdf a partir de manual/*.png
 python3 docs_web.py                    # docs/index.html (GitHub Pages) con las capturas reducidas
+python3 docs_web.py --local            # Web/ autocontenida: index.html + APK + PDF + img/, para cualquier otro alojamiento
 ```
 
 Requiere Python 3 con `pandas`, `requests`, `reportlab` y `Pillow`.
