@@ -188,11 +188,8 @@ story += [P("La aplicación se distribuye como un fichero <b>buscador_trenes.apk
           note("Cada nueva versión del APK lleva horarios más recientes. Cuando la aplicación detecte que sus horarios tienen más de dos meses, "
                "mostrará un aviso en la parte superior recomendando actualizar.", NARANJA, "Aviso"),
           figrow([("16_icono", "Icono de BuscaTrenes en el cajón de aplicaciones", (560, 1980)), ("01_inicio", "Pantalla inicial tras abrir la aplicación")], 6.2*cm)]
-story += H2("2.2 Otras formas de usar el buscador")
-story += [P("El buscador es en realidad un único fichero <b>buscador_trenes.html</b> que la aplicación Android envuelve. Ese mismo fichero se puede "
-            "abrir directamente en cualquier navegador de ordenador o móvil (Chrome, Safari, Firefox…) y funciona igual, con dos diferencias: "
-            "el botón <i>Compartir</i> usa el panel de compartir del navegador si lo tiene, y el retraso por GPS solo se estima en la app."),
-          P("Si tienes un Mac con Android Studio instalado, en la carpeta del proyecto encontrarás <b>Abrir_Emulador.command</b>: con doble clic "
+story += H2("2.2 Probar la aplicación en el emulador")
+story += [P("Si tienes un Mac con Android Studio instalado, en la carpeta del proyecto encontrarás <b>Abrir_Emulador.command</b>: con doble clic "
             "arranca el emulador de Android, instala el APK más reciente y abre BuscaTrenes, sin necesidad de un teléfono.")]
 
 # ---------- 3. Pantalla principal ----------
@@ -359,9 +356,7 @@ faq = [("No aparece ningún tren para una fecha de dentro de dos meses.",
        ("He actualizado la aplicación y he perdido los favoritos.",
         "Los favoritos se conservan al actualizar. Solo desaparecen si desinstalas la aplicación o si alguna de sus estaciones ya no existe en los horarios nuevos."),
        ("¿Por qué veo dos tarjetas con el mismo número de tren?",
-        "Son variantes del mismo tren con distinta vigencia o recorrido (por ejemplo, el mismo AVE termina en Barcelona unos días y en Figueres otros). Fíjate en la vigencia y el recorrido completo."),
-       ("¿Se puede usar en el ordenador?",
-        "Sí: abre buscador_trenes.html en cualquier navegador. Todo funciona igual salvo el retraso por GPS, que solo se estima en la app.")]
+        "Son variantes del mismo tren con distinta vigencia o recorrido (por ejemplo, el mismo AVE termina en Barcelona unos días y en Figueres otros). Fíjate en la vigencia y el recorrido completo.")]
 for q, a in faq:
     story += [KeepTogether([P("<b>%s</b>" % q), P(a)])]
 
