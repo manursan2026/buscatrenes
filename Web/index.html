@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BuscaTrenes · Buscador de trenes para Android</title>
+<meta name="description" content="Buscador de trenes offline para Android con los horarios de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca: trenes directos, transbordos, salidas por estación, incidencias y seguimiento del viaje.">
+<style>
+  :root {
+    --azul:#2F6BFF; --cian:#38BDF8; --naranja:#FF7A1A; --rosa:#E91E63; --morado:#7C4DFF; --amarillo:#FFC857; --verde:#1E8E4E;
+    --texto:#1F2937; --gris:#6B7280; --fondo:#F5F7FB; --tarjeta:#FFFFFF; --linea:#E5E7EB;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --texto:#F3F4F6; --gris:#9CA3AF; --fondo:#0F172A; --tarjeta:#1E293B; --linea:#334155; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; color:var(--texto); background:var(--fondo); line-height:1.55; }
+  a { color:var(--azul); }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 20px; }
+  header { background:linear-gradient(135deg,#0F172A 0%,#1E3A8A 55%,var(--azul) 100%); color:#fff; padding:56px 0 48px; }
+  header .wrap { display:flex; gap:32px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:2.6rem; margin:0 0 6px; letter-spacing:-.5px; }
+  header p.lead { font-size:1.15rem; margin:0 0 22px; opacity:.95; max-width:600px; }
+  .logo { width:96px; height:96px; flex:none; }
+  .botones { display:flex; gap:12px; flex-wrap:wrap; }
+  .btn { display:inline-flex; align-items:center; gap:10px; padding:14px 22px; border-radius:14px; font-weight:700; text-decoration:none; font-size:1.05rem; box-shadow:0 6px 18px rgba(0,0,0,.18); transition:transform .12s; }
+  .btn:hover { transform:translateY(-2px); }
+  .btn.apk { background:var(--amarillo); color:#1F2937; }
+  .btn.pdf { background:#fff; color:var(--azul); }
+  .btn small { display:block; font-weight:400; font-size:.8rem; opacity:.75; }
+  .btn svg { width:26px; height:26px; flex:none; }
+  main section { padding:44px 0; border-bottom:1px solid var(--linea); }
+  h2 { font-size:1.7rem; margin:0 0 8px; }
+  h2 span { display:inline-block; width:10px; height:26px; border-radius:4px; vertical-align:-4px; margin-right:10px; }
+  .sub { color:var(--gris); margin:0 0 24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+  .card { background:var(--tarjeta); border-radius:16px; padding:20px 22px; border:1px solid var(--linea); box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .card h3 { margin:0 0 6px; font-size:1.1rem; display:flex; align-items:center; gap:10px; }
+  .card h3 i { width:34px; height:34px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-style:normal; font-size:1.1rem; color:#fff; flex:none; }
+  .card p { margin:0; color:var(--gris); font-size:.97rem; }
+  .shots { display:flex; gap:18px; overflow-x:auto; padding:6px 2px 14px; scroll-snap-type:x mandatory; }
+  .shots figure { margin:0; flex:none; width:210px; scroll-snap-align:start; text-align:center; }
+  .shots img { width:100%; border-radius:18px; border:1px solid var(--linea); box-shadow:0 8px 24px rgba(0,0,0,.12); }
+  .shots figcaption { font-size:.85rem; color:var(--gris); margin-top:8px; }
+  ol.pasos { padding-left:0; list-style:none; counter-reset:p; display:grid; gap:12px; }
+  ol.pasos li { counter-increment:p; background:var(--tarjeta); border:1px solid var(--linea); border-radius:14px; padding:14px 16px 14px 60px; position:relative; }
+  ol.pasos li::before { content:counter(p); position:absolute; left:16px; top:12px; width:30px; height:30px; border-radius:50%; background:var(--azul); color:#fff; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; }
+  .dl .card { display:flex; flex-direction:column; gap:10px; }
+  .dl .btn { align-self:flex-start; box-shadow:none; border:2px solid var(--linea); }
+  .dl .btn.apk { border-color:transparent; }
+  .dl .btn.pdf { background:var(--azul); color:#fff; border-color:transparent; }
+  .nota { background:rgba(255,200,87,.18); border-left:4px solid var(--amarillo); padding:12px 16px; border-radius:8px; font-size:.95rem; }
+  .ops { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .ops span { background:var(--tarjeta); border:1px solid var(--linea); border-radius:999px; padding:5px 14px; font-size:.9rem; font-weight:600; }
+  code { background:var(--tarjeta); border:1px solid var(--linea); border-radius:6px; padding:1px 6px; font-size:.92em; }
+  footer { padding:28px 0 40px; color:var(--gris); font-size:.9rem; text-align:center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <svg class="logo" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="46" fill="rgba(255,255,255,.14)"/>
+      <rect x="27" y="24" width="46" height="44" rx="9" fill="#fff"/>
+      <rect x="33" y="31" width="14" height="14" rx="3" fill="#2F6BFF"/>
+      <rect x="53" y="31" width="14" height="14" rx="3" fill="#2F6BFF"/>
+      <rect x="33" y="52" width="34" height="7" rx="3" fill="#0F172A"/>
+      <circle cx="37" cy="74" r="4.5" fill="#FFC857"/><circle cx="63" cy="74" r="4.5" fill="#FFC857"/>
+      <path d="M24 82 L76 82" stroke="#38BDF8" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>BuscaTrenes</h1>
+      <p class="lead">Buscador de trenes para Android que funciona sin conexión: horarios de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca, con transbordos automáticos, salidas por estación, incidencias y seguimiento del viaje.</p>
+      <div class="botones">
+        <a class="btn apk" href="buscador_trenes.apk" download>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.4 11.4 0 0 0-8.94 0L5.65 5.67a.63.63 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+          <span>Descargar APK<small>Android 7.0 o superior · 3.4 MB · horarios del 17/09/2026</small></span>
+        </a>
+        <a class="btn pdf" href="Manual_BuscaTrenes.pdf" download>
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 13h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>
+          <span>Manual de usuario<small>PDF · 2.6 MB</small></span>
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+<section id="que-es">
+  <h2><span style="background:var(--azul)"></span>¿Qué es BuscaTrenes?</h2>
+  <p class="sub">Un buscador de trenes sencillo, sin cuentas ni publicidad, con todos los horarios dentro de la aplicación.</p>
+  <p>Escribe una estación de origen y otra de destino, elige fecha y hora y <strong>BuscaTrenes</strong> te muestra los trenes directos de todos los operadores a la vez. Si no hay ninguno, busca automáticamente combinaciones con uno o dos transbordos respetando el tiempo mínimo de enlace que tú decidas. Como los horarios van embebidos, la búsqueda funciona sin cobertura; la red solo se usa para las incidencias y los retrasos en tiempo real.</p>
+  <div class="ops"><span>RENFE AV · LD · MD</span><span>Cercanías</span><span>OUIGO</span><span>FGC</span><span>Euskotren</span><span>SFM Mallorca</span></div>
+</section>
+
+<section id="capturas">
+  <h2><span style="background:var(--cian)"></span>Así se ve</h2>
+  <p class="sub">Horarios del 17/09/2026.</p>
+  <div class="shots">
+    <figure><img src="img/01_inicio.jpg" alt="Búsqueda de trayecto" loading="lazy"><figcaption>Búsqueda de trayecto</figcaption></figure>
+    <figure><img src="img/05_resultados.jpg" alt="Trenes directos con filtros" loading="lazy"><figcaption>Trenes directos con filtros</figcaption></figure>
+    <figure><img src="img/12_transbordo.jpg" alt="Enlaces con transbordo" loading="lazy"><figcaption>Enlaces con transbordo</figcaption></figure>
+    <figure><img src="img/09_seguimiento.jpg" alt="Seguimiento del viaje" loading="lazy"><figcaption>Seguimiento del viaje</figcaption></figure>
+    <figure><img src="img/13_salidas.jpg" alt="Salidas por estación" loading="lazy"><figcaption>Salidas por estación</figcaption></figure>
+    <figure><img src="img/15_incidencias.jpg" alt="Incidencias en tiempo real" loading="lazy"><figcaption>Incidencias en tiempo real</figcaption></figure>
+  </div>
+</section>
+
+<section id="funciones">
+  <h2><span style="background:var(--naranja)"></span>Funciones principales</h2>
+  <p class="sub">Todo lo que hace la aplicación, resumido.</p>
+  <div class="grid">
+    <div class="card"><h3><i style="background:var(--azul)">🚆</i>Trenes directos</h3><p>Todos los operadores en una sola lista, con número de tren, línea, duración, paradas intermedias, días de circulación y vigencia del horario.</p></div>
+    <div class="card"><h3><i style="background:var(--cian)">🔁</i>Transbordos automáticos</h3><p>Si no hay tren directo, combinaciones con 1 o 2 transbordos, incluidos los cambios a pie entre estaciones próximas.</p></div>
+    <div class="card"><h3><i style="background:var(--naranja)">🎯</i>Seguimiento del viaje</h3><p>Cuenta atrás, croquis de la ruta, próximas paradas, avisos de transbordo y retraso oficial de RENFE o estimado por GPS.</p></div>
+    <div class="card"><h3><i style="background:var(--rosa)">🕒</i>Salidas por estación</h3><p>El panel de salidas de cualquier estación a partir de una hora, con destino final, línea y retraso si se conoce.</p></div>
+    <div class="card"><h3><i style="background:var(--morado)">🔢</i>Búsqueda por número</h3><p>Localiza un tren por su número y consulta su recorrido completo con todas las paradas.</p></div>
+    <div class="card"><h3><i style="background:#D81B60">⚠️</i>Incidencias</h3><p>Obras, cortes y servicios alternativos publicados por los operadores, en tu zona o en toda España, y dentro de cada resultado afectado.</p></div>
+    <div class="card"><h3><i style="background:var(--verde)">📍</i>Tu ubicación</h3><p>Rellena el origen con la estación más cercana a donde estás.</p></div>
+    <div class="card"><h3><i style="background:#3949AB">⭐</i>Favoritos</h3><p>Guarda tus trayectos habituales como accesos rápidos de un solo toque.</p></div>
+    <div class="card"><h3><i style="background:#00897B">📤</i>Compartir y calendario</h3><p>Envía el itinerario por WhatsApp o correo, o añádelo a tu calendario con un toque.</p></div>
+    <div class="card"><h3><i style="background:#6D4C41">✈️</i>Sin conexión</h3><p>Todo el buscador funciona en modo avión: los horarios viajan dentro de la app.</p></div>
+  </div>
+</section>
+
+<section id="instalar">
+  <h2><span style="background:var(--rosa)"></span>Cómo instalar la APK</h2>
+  <p class="sub">La aplicación no está en Google Play, por lo que se instala directamente desde el fichero.</p>
+  <ol class="pasos">
+    <li>Desde el navegador de tu móvil o tablet Android, pulsa <strong>Descargar APK</strong> y guarda el fichero <code>buscador_trenes.apk</code>.</li>
+    <li>Abre el fichero descargado (desde la notificación de descarga o con la app <em>Archivos</em>).</li>
+    <li>Si Android pregunta, permite a esa app <strong>instalar aplicaciones desconocidas</strong> y pulsa <strong>Instalar</strong>.</li>
+    <li>Abre <strong>BuscaTrenes</strong>. Cuando uses «Usar mi ubicación» o el seguimiento, concede el permiso de ubicación <em>mientras se usa la aplicación</em>.</li>
+  </ol>
+  <p class="nota" style="margin-top:18px">Los horarios tienen fecha de caducidad: cada versión nueva del APK incorpora los horarios vigentes. Si la app avisa de que sus datos tienen más de dos meses, vuelve aquí y descarga la última versión (se instala encima y conserva tus favoritos).</p>
+</section>
+
+<section id="descargas">
+  <h2><span style="background:var(--morado)"></span>Descargas</h2>
+  <p class="sub">Versión 1.0 · horarios extraídos el 17/09/2026 · página actualizada el 17/09/2026.</p>
+  <div class="dl">
+    <div class="card"><h3>Aplicación Android</h3><p>Instalable en cualquier Android 7.0 o superior. Firmada con clave de desarrollo: si ya tienes instalada una versión compilada en otro ordenador, desinstálala antes.</p><a class="btn apk" href="buscador_trenes.apk" download>Descargar buscador_trenes.apk (3.4 MB)</a></div>
+    <div class="card"><h3>Manual de usuario</h3><p>Guía completa con capturas: instalación, búsqueda, transbordos, seguimiento, salidas, incidencias, origen de los datos y preguntas frecuentes.</p><a class="btn pdf" href="Manual_BuscaTrenes.pdf" download>Descargar Manual_BuscaTrenes.pdf (2.6 MB)</a></div>
+  </div>
+</section>
+
+</div>
+</main>
+
+<footer>
+  BuscaTrenes · Datos horarios públicos (GTFS) de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca. Aplicación independiente, sin relación con los operadores.
+</footer>
+
+</body>
+</html>

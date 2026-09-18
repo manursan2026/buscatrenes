@@ -10,5 +10,3 @@ android_buscador/build/
 # Intermedios del manual (JPG reducidos que genera docs_manual.py)
 manual/_emb_*
 
-# Web de descargas autocontenida (docs_web.py): duplica el APK y el PDF, se sube a mano al alojamiento
-Web/
