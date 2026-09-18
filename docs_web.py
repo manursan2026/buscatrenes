@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Página web de descargas de BuscaTrenes: genera la carpeta Web/ autocontenida
+"""Página web de descargas de BuscaTrenes: genera la carpeta docs/ autocontenida
 (index.html con enlaces relativos + buscador_trenes.apk + Manual_BuscaTrenes.pdf + img/),
-lista para copiar entera a cualquier alojamiento."""
+que GitHub Pages sirve desde la rama master en https://manursan2026.github.io/buscatrenes/."""
 import os, re, shutil, datetime
 from PIL import Image
 
 S = os.path.dirname(os.path.abspath(__file__))
-D = os.path.join(S, "Web"); IMG = os.path.join(D, "img")
+D = os.path.join(S, "docs"); IMG = os.path.join(D, "img")
 os.makedirs(IMG, exist_ok=True)
+open(os.path.join(D, ".nojekyll"), "w").close()  # que Pages sirva los ficheros tal cual, sin Jekyll
 for f in ("buscador_trenes.apk", "Manual_BuscaTrenes.pdf"):
     shutil.copy2(os.path.join(S, f), os.path.join(D, f))
 VERSION = re.search(r'versionName="([^"]+)"', open(os.path.join(S, "android_buscador", "AndroidManifest.xml")).read()).group(1)
@@ -181,4 +182,4 @@ page = f"""<!DOCTYPE html>
 </html>
 """
 open(os.path.join(D, "index.html"), "w", encoding="utf-8").write(page)
-print("Generado Web/index.html (%d KB) + %d capturas en Web/img + APK y manual copiados" % (len(page.encode()) // 1024, len(SHOTS)))
+print("Generado docs/index.html (%d KB) + %d capturas en docs/img + APK y manual copiados" % (len(page.encode()) // 1024, len(SHOTS)))

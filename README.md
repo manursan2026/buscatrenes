@@ -29,10 +29,10 @@ llamadas de red en tiempo de uso.
   app. Requiere Android Studio con el AVD `Medium_Phone_API_36.1`.
 - `manual/` + `docs_manual.py` — capturas del emulador y generador del
   `Manual_BuscaTrenes.pdf` (reportlab).
-- `docs_web.py` — genera `Web/` (no versionada): página de descargas
-  `index.html` con enlaces relativos y, al lado, el APK, el manual PDF y
-  las capturas reducidas; la carpeta se copia entera al alojamiento que se
-  quiera.
+- `docs_web.py` — genera `docs/`: página de descargas `index.html` con
+  enlaces relativos y, al lado, el APK, el manual PDF y las capturas
+  reducidas. GitHub Pages sirve esa carpeta en
+  <https://manursan2026.github.io/buscatrenes/>.
 
 ## Regenerar todo
 
@@ -41,7 +41,7 @@ python3 build_buscador_data.py        # descarga los GTFS -> buscador_data.b64
 python3 generar_buscador_html.py       # genera buscador_trenes.html
 android_buscador/build_apk.sh          # genera buscador_trenes.apk (ver requisitos en android_buscador/README.md)
 python3 docs_manual.py                 # Manual_BuscaTrenes.pdf a partir de manual/*.png
-python3 docs_web.py                    # Web/ autocontenida: index.html + APK + PDF + img/, para subir a cualquier alojamiento
+python3 docs_web.py                    # docs/ autocontenida: index.html + APK + PDF + img/ (GitHub Pages)
 ```
 
 Requiere Python 3 con `pandas`, `requests`, `reportlab` y `Pillow`.
@@ -53,11 +53,13 @@ scripts de documentación.
 
 ## Publicar una versión nueva
 
-El código vive en GitHub (<https://github.com/manursan2026/buscatrenes>);
-la página de descargas se aloja aparte, copiando la carpeta `Web/`.
+El código vive en GitHub (<https://github.com/manursan2026/buscatrenes>) y
+la página de descargas la sirve GitHub Pages desde `docs/` en la rama
+`master` (<https://manursan2026.github.io/buscatrenes/>), así que se
+actualiza sola con cada push.
 
 Tras regenerar todo, commit y push, publicar una release con el APK y el
-manual, y volver a subir `Web/` al alojamiento:
+manual:
 
 ```bash
 gh release create v1.0-$(date +%Y.%m.%d) buscador_trenes.apk Manual_BuscaTrenes.pdf \
