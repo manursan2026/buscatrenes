@@ -149,7 +149,7 @@ story += [Spacer(1, 2.2*cm), P("BuscaTrenes", "title"), Spacer(1, 0.3*cm),
 cover_tbl = Table([[shot("01_inicio", 4.4*cm), shot("05_resultados", 4.4*cm), shot("09_seguimiento", 4.4*cm)]], colWidths=[5.2*cm]*3, hAlign="CENTER")
 cover_tbl.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER")]))
 story += [cover_tbl, Spacer(1, 0.8*cm),
-          Paragraph("Versión %s · %s · Capturas tomadas en el emulador de Android con los horarios extraídos el %s." % (VERSION, FECHA_LARGA, DATA_FECHA_TXT), st["cap"])]
+          Paragraph("Versión %s · %s · Horarios extraídos el %s." % (VERSION, FECHA_LARGA, DATA_FECHA_TXT), st["cap"])]
 
 # ---------- Índice ----------
 toc = TableOfContents(); toc.levelStyles = [st["toc1"], st["toc2"]]; toc.dotsMinLevel = 0
@@ -179,7 +179,6 @@ story += [P("El capítulo 2 explica cómo instalar la aplicación. El 3 presenta
 
 # ---------- 2. Instalación ----------
 story += H1("2. Instalación y primer arranque")
-story += H2("2.1 Instalar el APK en el teléfono")
 story += [P("La aplicación se distribuye como un fichero <b>buscador_trenes.apk</b> (no está en Google Play). Para instalarlo:"),
           bullets(["Descarga o copia el fichero al dispositivo (desde la página web de descargas con el navegador del móvil, por cable USB, correo, Drive…).",
                    "Ábrelo desde la notificación de descarga o con la aplicación <i>Archivos</i>.",
@@ -188,9 +187,6 @@ story += [P("La aplicación se distribuye como un fichero <b>buscador_trenes.apk
           note("Cada nueva versión del APK lleva horarios más recientes. Cuando la aplicación detecte que sus horarios tienen más de dos meses, "
                "mostrará un aviso en la parte superior recomendando actualizar.", NARANJA, "Aviso"),
           figrow([("16_icono_marcado", "Icono de BuscaTrenes en el cajón de aplicaciones"), ("01_inicio", "Pantalla inicial tras abrir la aplicación")], 6.2*cm)]
-story += H2("2.2 Probar la aplicación en el emulador")
-story += [P("Si tienes un Mac con Android Studio instalado, en la carpeta del proyecto encontrarás <b>Abrir_Emulador.command</b>: con doble clic "
-            "arranca el emulador de Android, instala el APK más reciente y abre BuscaTrenes, sin necesidad de un teléfono.")]
 
 # ---------- 3. Pantalla principal ----------
 story += H1("3. La pantalla principal")

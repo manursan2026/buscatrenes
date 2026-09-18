@@ -126,7 +126,7 @@ page = f"""<!DOCTYPE html>
 
 <section id="capturas">
   <h2><span style="background:var(--cian)"></span>Así se ve</h2>
-  <p class="sub">Capturas tomadas en el emulador de Android con los horarios del {DATA_FECHA_TXT}.</p>
+  <p class="sub">Horarios del {DATA_FECHA_TXT}.</p>
   <div class="shots">
 {figs}
   </div>
