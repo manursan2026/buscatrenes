@@ -1,0 +1,26 @@
+{
+  "_formato": "Avisos propios de BuscaTrenes. Se publican en la web de descargas y la app los lee al buscar. Sirven para lo que ninguna fuente pública en formato máquina recoge: interrupciones que duran días o semanas. No ocultan trenes, solo avisan.",
+  "_campos": {
+    "id": "identificador corto y único",
+    "desde / hasta": "fechas YYYY-MM-DD, ambas incluidas; el aviso solo sale si la fecha buscada cae dentro",
+    "titulo": "una línea, se muestra en cada tren afectado",
+    "texto": "el detalle, se muestra una vez encima de los resultados",
+    "cats": "opcional: categorías afectadas (AV, LD, MD, CER, OUIGO, FGC, EUS, SFM)",
+    "entre": "opcional: dos grupos de estaciones; afecta al tren que toque una de cada grupo",
+    "estaciones": "opcional: lista plana; afecta al tren que toque cualquiera de ellas"
+  },
+  "actualizado": "2026-11-02",
+  "avisos": [
+    {
+      "id": "urda-2026",
+      "desde": "2026-10-28",
+      "hasta": "2026-11-14",
+      "titulo": "Alta velocidad Madrid–Andalucía interrumpida",
+      "texto": "Tras el accidente de Urda (Toledo) del 28 de octubre, la línea de alta velocidad entre Madrid y Andalucía sigue cortada y Renfe no vende billetes de ese corredor. Los trenes que ves aquí son los del horario publicado, que Renfe no ha retirado: no van a circular mientras dure la interrupción. Consulta renfe.com antes de ir a la estación.",
+      "entre": [
+        ["Madrid-Puerta de Atocha-Almudena Grandes", "Madrid-Chamartín-Clara Campoamor"],
+        ["Sevilla-Santa Justa", "Córdoba-Julio Anguita", "Málaga María Zambrano", "Granada", "Cádiz", "Huelva", "Jerez de la Frontera", "Antequera-Santa Ana", "Algeciras"]
+      ]
+    }
+  ]
+}
