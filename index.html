@@ -25,6 +25,7 @@
   .botones { display:flex; gap:12px; flex-wrap:wrap; }
   .btn { display:inline-flex; align-items:center; gap:10px; padding:14px 22px; border-radius:14px; font-weight:700; text-decoration:none; font-size:1.05rem; box-shadow:0 6px 18px rgba(0,0,0,.18); transition:transform .12s; }
   .btn:hover { transform:translateY(-2px); }
+  .btn.play { background:#01875F; color:#fff; }
   .btn.apk { background:var(--amarillo); color:#1F2937; }
   .btn.pdf { background:#fff; color:var(--azul); }
   .btn small { display:block; font-weight:400; font-size:.8rem; opacity:.75; }
@@ -48,6 +49,7 @@
   .dl { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:18px; }
   .dl .card { display:flex; flex-direction:column; gap:10px; }
   .dl .btn { align-self:flex-start; box-shadow:none; border:2px solid var(--linea); }
+  .dl .btn.play { border-color:transparent; }
   .dl .btn.apk { border-color:transparent; }
   .dl .btn.pdf { background:var(--azul); color:#fff; border-color:transparent; }
   .nota { background:rgba(255,200,87,.18); border-left:4px solid var(--amarillo); padding:12px 16px; border-radius:8px; font-size:.95rem; }
@@ -74,6 +76,10 @@
       <h1>BuscaTrenes</h1>
       <p class="lead">Buscador de trenes para Android que funciona sin conexión: horarios de RENFE, OUIGO, FGC, Euskotren y SFM Mallorca, con transbordos automáticos, salidas por estación, incidencias y seguimiento del viaje.</p>
       <div class="botones">
+        <a class="btn play" href="https://play.google.com/store/apps/details?id=com.manursan.buscadortrenes">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.6 2.3c-.4.3-.6.7-.6 1.2v17c0 .5.2 1 .6 1.2l9.1-9.7L3.6 2.3zm11 8.1L5.5 1.6l10.8 6.2-1.7 2.6zM5.5 22.4l9.1-8.8 1.7 2.6-10.8 6.2zm12.5-7.2-2.1-3.2 2.1-3.2 3.3 1.9c.8.5.8 1.6 0 2.1l-3.3 2.4z"/></svg>
+          <span>Descargar en Google Play<small>Se actualiza sola</small></span>
+        </a>
         <a class="btn apk" href="buscador_trenes.apk" download>
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.4 11.4 0 0 0-8.94 0L5.65 5.67a.63.63 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.8 10.8 0 0 0 1 18h22a10.8 10.8 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
           <span>Descargar APK<small>Android 7.0 o superior · 2.8 MB</small></span>
@@ -127,22 +133,24 @@
 </section>
 
 <section id="instalar">
-  <h2><span style="background:var(--rosa)"></span>Cómo instalar la APK</h2>
-  <p class="sub">La aplicación no está en Google Play, por lo que se instala directamente desde el fichero.</p>
+  <h2><span style="background:var(--rosa)"></span>Cómo instalar</h2>
+  <p class="sub">Lo más cómodo es instalarla desde <a href="https://play.google.com/store/apps/details?id=com.manursan.buscadortrenes">Google Play</a>: se instala con un toque y se actualiza sola, así que los horarios se mantienen al día sin que tengas que hacer nada.</p>
+  <p class="sub">Si prefieres instalar el fichero directamente, por ejemplo en un dispositivo sin Google Play:</p>
   <ol class="pasos">
     <li>Desde el navegador de tu móvil o tablet Android, pulsa <strong>Descargar APK</strong> y guarda el fichero <code>buscador_trenes.apk</code>.</li>
     <li>Abre el fichero descargado (desde la notificación de descarga o con la app <em>Archivos</em>).</li>
     <li>Si Android pregunta, permite a esa app <strong>instalar aplicaciones desconocidas</strong> y pulsa <strong>Instalar</strong>.</li>
     <li>Abre <strong>BuscaTrenes</strong>. Cuando uses «Usar mi ubicación» o el seguimiento, concede el permiso de ubicación <em>mientras se usa la aplicación</em>.</li>
   </ol>
-  <p class="nota" style="margin-top:18px">Los horarios tienen fecha de caducidad: cada versión nueva del APK incorpora los horarios vigentes. Si la app avisa de que sus datos tienen más de dos meses, vuelve aquí y descarga la última versión (se instala encima y conserva tus favoritos).</p>
+  <p class="nota" style="margin-top:18px">Los horarios tienen fecha de caducidad: cada versión nueva incorpora los horarios vigentes. Desde Google Play la actualización llega sola; si instalaste el APK a mano y la app avisa de que sus datos tienen más de dos meses, vuelve aquí y descarga la última versión (se instala encima y conserva tus favoritos).</p>
 </section>
 
 <section id="descargas">
   <h2><span style="background:var(--morado)"></span>Descargas</h2>
   <p class="sub">Versión 1.0.9.</p>
   <div class="dl">
-    <div class="card"><h3>Aplicación Android</h3><p>Instalable en cualquier Android 7.0 o superior. Se instala directamente desde el fichero, sin pasar por Google Play.</p><a class="btn apk" href="buscador_trenes.apk" download>Descargar buscador_trenes.apk (2.8 MB)</a></div>
+    <div class="card"><h3>Google Play</h3><p>La forma recomendada: instalación con un toque y actualizaciones automáticas, con los horarios siempre al día.</p><a class="btn play" href="https://play.google.com/store/apps/details?id=com.manursan.buscadortrenes">Ver en Google Play</a></div>
+    <div class="card"><h3>Aplicación Android (APK)</h3><p>El fichero suelto, para instalar a mano en cualquier Android 7.0 o superior, también sin Google Play.</p><a class="btn apk" href="buscador_trenes.apk" download>Descargar buscador_trenes.apk (2.8 MB)</a></div>
     <div class="card"><h3>Manual de usuario</h3><p>Guía completa con capturas: instalación, búsqueda, transbordos, seguimiento, salidas, incidencias, origen de los horarios y preguntas frecuentes.</p><a class="btn pdf" href="Manual_BuscaTrenes.pdf" download>Descargar Manual_BuscaTrenes.pdf (3.1 MB)</a></div>
   </div>
 </section>
